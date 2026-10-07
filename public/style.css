@@ -318,3 +318,21 @@ a.chip{text-decoration:none}
 .chip{white-space:nowrap;flex:none;align-items:center}
 .chip .cdot{flex:none}
 .chips{min-width:0}
+
+/* ---------- header: tidy on phones ---------- */
+.top-right{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.actions{display:flex;align-items:center;gap:8px}
+.signout-m svg{width:18px;height:18px}
+@media(max-width:700px){
+  .top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 10px;margin-bottom:12px}
+  .top-right{display:contents}
+  .top .title{grid-column:1;grid-row:1;min-width:0}
+  .top .actions{grid-column:2;grid-row:1}
+  .top #chips{grid-column:1 / -1;grid-row:2;flex-wrap:wrap;gap:6px}
+  .chip{padding:6px 11px;font-size:12px}
+  .signout-m{display:grid;place-items:center;width:36px;height:36px;padding:0;border-radius:50%}
+  .chip.st.ok{padding:0;width:36px;height:36px;justify-content:center;border-radius:50%}
+  .chip.st.ok .txt{display:none}
+  .chip.st.ok .dot{width:10px;height:10px}
+  h1{font-size:21px}
+}

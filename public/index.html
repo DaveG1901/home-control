@@ -51,6 +51,7 @@
     <rect x="13" y="33" width="38" height="9" rx="3.5" fill="url(#binLid)"/>
     <rect x="25" y="52" width="14" height="4" rx="2" fill="#000" opacity=".26"/>
   </symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6a2 2 0 00-2 2v12a2 2 0 002 2h3"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></symbol>
 </defs></svg>
 
 <div class="app">
@@ -67,9 +68,14 @@
 </nav>
 <main>
   <div class="top">
-    <div><h1 id="greeting">Home</h1><div class="sub" id="subtitle"></div></div>
-    <div class="chips" id="chips"></div>
-    <button class="signout-m" id="logout-m">Sign out</button>
+    <div class="title"><h1 id="greeting">Home</h1><div class="sub" id="subtitle"></div></div>
+    <div class="top-right">
+      <div class="chips" id="chips"></div>
+      <div class="actions">
+        <div class="chips" id="status"></div>
+        <button class="signout-m" id="logout-m" aria-label="Sign out" title="Sign out"><svg><use href="#i-logout"/></svg></button>
+      </div>
+    </div>
   </div>
   <div class="grid">
     <section class="card c8" id="energy"></section>

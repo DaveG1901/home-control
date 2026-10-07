@@ -127,11 +127,15 @@ function renderHeader(m) {
     const dots = bn.bins.map((k) => `<i class="cdot" style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('');
     chips.push(`<a class="chip binchip${urgent ? ' urgent' : ''}" href="#/overview" title="Next bin collection: ${esc(`${bn.weekday} ${bn.dayMonth}`)}">${dots}<span>${esc(text)}</span></a>`);
   }
-  if (m.connection.error) chips.push(`<div class="chip bad"><span class="dot red"></span>${esc(m.connection.error)}</div>`);
-  else if (!wsOpen) chips.push('<div class="chip demo"><span class="dot amber"></span>Reconnecting…</div>');
-  else if (!m.connection.ha) chips.push('<div class="chip bad"><span class="dot red"></span>Home Assistant offline</div>');
-  else chips.push('<div class="chip"><span class="dot"></span>Live</div>');
   setHTML($('#chips'), chips.join(''));
+
+  // Connection status has its own spot (top right). When all is well, phones show just the green dot.
+  let status;
+  if (m.connection.error) status = `<div class="chip st bad"><span class="dot red"></span><span class="txt">${esc(m.connection.error)}</span></div>`;
+  else if (!wsOpen) status = '<div class="chip st demo"><span class="dot amber"></span><span class="txt">Reconnecting…</span></div>';
+  else if (!m.connection.ha) status = '<div class="chip st bad"><span class="dot red"></span><span class="txt">Home Assistant offline</span></div>';
+  else status = '<div class="chip st ok" title="Live: connected to Home Assistant"><span class="dot"></span><span class="txt">Live</span></div>';
+  setHTML($('#status'), status);
 }
 
 // ---------- energy (structure built once so the flow animation never restarts) ----------

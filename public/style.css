@@ -235,3 +235,52 @@ main,.card,.top>div{min-width:0}
 .spd .top{flex-wrap:nowrap}
 .spd .top b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .spd{min-width:0}
+
+/* ---------- live camera tiles ---------- */
+.cam .view{aspect-ratio:16/9;cursor:pointer;overflow:hidden}
+.view video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#050c1d;display:none}
+.cam.playing .view video{display:block}
+.cam.playing .view>svg,.cam.playing .view::after{display:none}
+.cam .live{z-index:2}
+.view::after{pointer-events:none}
+.vmsg{position:absolute;left:8px;right:8px;bottom:8px;text-align:center;font-size:11px;line-height:1.3;color:var(--mute);z-index:2;text-shadow:0 1px 3px #000}
+.view:focus-visible{outline:2px solid #60a5fa;outline-offset:-2px}
+
+/* ---------- heating boost ---------- */
+.boostrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line);font-size:13px;color:var(--mute)}
+.boostrow.on{border-color:rgba(242,184,75,.45);color:var(--amber);background:rgba(242,184,75,.07)}
+.bbtns{display:flex;gap:8px;flex-wrap:wrap}
+.zone.boosting{border-color:rgba(242,184,75,.5);box-shadow:inset 0 0 0 1px rgba(242,184,75,.12)}
+.zone.boosting small{color:var(--amber)}
+.zb{margin-top:8px;width:100%;padding:6px 8px;border-radius:9px;border:1px solid var(--line2);background:rgba(59,130,246,.12);color:var(--ice);font:inherit;font-size:12px;cursor:pointer}
+.zb:hover{background:rgba(59,130,246,.3)}
+.zb.on{background:rgba(242,184,75,.15);border-color:rgba(242,184,75,.5);color:var(--amber)}
+.zb:disabled{opacity:.4;cursor:not-allowed}
+.bmenu{display:flex;gap:5px;margin-top:8px}
+.bmenu button{flex:1;padding:6px 0;border-radius:9px;border:1px solid var(--line2);background:rgba(59,130,246,.18);color:var(--ice);font:inherit;font-size:12px;cursor:pointer}
+.bmenu button:hover{background:var(--blue);color:#fff}
+.bmenu .x{flex:0 0 28px;background:none;color:var(--mute)}
+
+/* ---------- plugs and lights lists ---------- */
+.filter{width:100%;max-width:420px;margin:0 0 16px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(8,20,48,.7);color:var(--text);font:inherit;font-size:14px;outline:none}
+.filter:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+.dgroups{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:20px 22px;align-items:start}
+.dgroup{display:flex;flex-direction:column;gap:8px;min-width:0}
+.dgh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--mute);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:0 2px}
+.dgh small{font-size:11.5px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--dim)}
+.drow{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;background:rgba(8,20,48,.55);border:1px solid var(--line)}
+.drow.off{opacity:.55}
+.drow .dn{flex:1;min-width:0}
+.drow .dn b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .dn small{color:var(--mute);font-size:11.5px}
+a.tag{text-decoration:none}
+a.tag:hover{background:rgba(59,130,246,.3)}
+
+/* Devices page: the lists first, then the solar helper */
+.grid[data-view=devices] #plugs{order:1}
+.grid[data-view=devices] #lights{order:2}
+.grid[data-view=devices] #surplus{order:3}
+.grid[data-view=devices] #consumers{order:4}
+/* appliance names in the solar tiles may wrap instead of being cut off */
+.spd .top{align-items:flex-start}
+.spd .top b{white-space:normal;overflow:visible;text-overflow:clip}

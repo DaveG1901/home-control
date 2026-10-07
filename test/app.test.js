@@ -149,3 +149,38 @@ test('login is rate limited after repeated failures', async (t) => {
   for (let i = 0; i < 5; i++) assert.equal((await post('wrong')).status, 401);
   assert.equal((await post('correct-horse')).status, 429); // locked out even with the right password
 });
+
+test('camera streams: authenticated, allowlisted, demo flag, and live addresses point at Home Assistant', async (t) => {
+  const login = async (base, password) => (await fetch(`${base}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) })).headers.get('set-cookie').split(';')[0];
+
+  // demo mode
+  const demo = await start({ port: 0, mode: 'demo', haUrl: '', haToken: '', appPassword: 'correct-horse', sessionSecret: 's'.repeat(32), databaseUrl: '', production: false });
+  t.after(() => demo.close());
+  const dBase = `http://127.0.0.1:${demo.port}`;
+  assert.equal((await fetch(`${dBase}/api/camera/garage/stream`)).status, 401, 'needs a session');
+  const dCookie = await login(dBase, 'correct-horse');
+  assert.deepEqual(await (await fetch(`${dBase}/api/camera/garage/stream`, { headers: { Cookie: dCookie } })).json(), { demo: true });
+  assert.equal((await fetch(`${dBase}/api/camera/bedroom/stream`, { headers: { Cookie: dCookie } })).status, 404, 'unknown cameras are refused');
+  const lib = await fetch(`${dBase}/vendor/hls.min.js`, { headers: { Cookie: dCookie } });
+  assert.equal(lib.status, 200);
+  assert.match(await lib.text(), /Hls/);
+  assert.equal((await fetch(`${dBase}/vendor/hls.min.js`, { redirect: 'manual' })).status, 302, 'player library is behind the login too');
+
+  // live mode against the fake Home Assistant
+  const fake = await createFakeHa({ token: 'live-token', animate: false });
+  t.after(() => fake.close());
+  const live = await start({ port: 0, mode: 'live', haUrl: fake.url, haToken: 'live-token', appPassword: 'correct-horse', sessionSecret: 's'.repeat(32), databaseUrl: '', production: false });
+  t.after(() => live.close());
+  await until(() => live.store.ready);
+  const lBase = `http://127.0.0.1:${live.port}`;
+  const lCookie = await login(lBase, 'correct-horse');
+  const res = await fetch(`${lBase}/api/camera/front_garden/stream`, { headers: { Cookie: lCookie } });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).url, `${fake.url}/api/hls/faketoken/master_playlist.m3u8`);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+  // the browser may load video from Home Assistant, and only from there
+  const csp = (await fetch(`${lBase}/login`)).headers.get('content-security-policy');
+  assert.ok(csp.includes(`media-src 'self' blob: ${new URL(fake.url).origin}`));
+  const dCsp = (await fetch(`${dBase}/login`)).headers.get('content-security-policy');
+  assert.ok(!dCsp.includes('http://127.0.0.1:' + fake.port), 'demo mode does not whitelist any Home Assistant origin');
+});

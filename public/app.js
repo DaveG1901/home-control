@@ -76,12 +76,20 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-cmd],[data-act]');
   if (!t || t.disabled || !model) return;
   if (t.dataset.act === 'step') return stepTarget(Number(t.dataset.d));
+  if (t.dataset.act === 'boostmenu') { openBoost = openBoost === t.dataset.z ? null : t.dataset.z; return renderAll(); }
   const id = t.dataset.cmd;
   let value;
   if (t.dataset.n !== undefined) value = Number(t.dataset.n);
   else if (t.dataset.toggle !== undefined) value = t.classList.contains('on') ? 'off' : 'on';
   else value = t.dataset.v;
-  const msg = id === 'hotwater.boost' ? (value === 0 ? 'Hot water boost cancelled' : `Hot water boost for ${value} min`) : undefined;
+  if (t.dataset.toggle !== undefined && value === 'off') {
+    const watts = Number(t.dataset.watts) || 0;
+    if (watts > 50 && !window.confirm(`${t.dataset.name || 'This device'} is using ${Math.round(watts)} W right now. Switch it off?`)) return;
+  }
+  if (t.hasAttribute('data-close')) openBoost = null;
+  let msg;
+  if (id === 'hotwater.boost') msg = value === 0 ? 'Hot water boost cancelled' : `Hot water boost for ${durText(value)}`;
+  else if (id.startsWith('boost:')) msg = value === 0 ? 'Boost cancelled' : `Boost started for ${durText(value)}`;
   command(id, value, msg);
 });
 
@@ -205,7 +213,7 @@ function renderSurplus(m) {
     const on = opt(`plug:${d.id}`, d.state) === 'on';
     const sw = d.fit === 'unavailable'
       ? '<button class="sw lock" disabled title="Unavailable"></button>'
-      : `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle aria-label="${esc(d.name)}"></button>`;
+      : `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle data-name="${esc(d.name)}" data-watts="${d.watts ?? 0}" aria-label="${esc(d.name)}"></button>`;
     return `<div class="spd ${esc(d.fit)}"><div class="top"><b>${esc(d.name)}</b>${sw}</div>
       <small>Typically ${fx(d.kw, 1)} kW</small><span class="fit ${esc(d.fit)}">${esc(fitText(d))}</span></div>`;
   }).join('');
@@ -226,19 +234,47 @@ function renderSurplus(m) {
     </div>`);
 }
 
+// ---------- heating (with boost on the main thermostat, every zone and hot water) ----------
+let openBoost = null; // id of the zone whose boost menu is open
+const durText = (m) => (m % 60 === 0 ? `${m / 60}h` : `${m}m`);
+
 function renderHeating(m) {
   const h = m.heating;
   const main = h.main;
   const off = main.mode === 'unavailable';
   const target = opt('heating.target', main.target);
   const mode = opt('heating.mode', main.mode);
+  const minutes = h.boost.minutes;
   const modeBtn = (label, v) => `<button data-cmd="heating.mode" data-v="${esc(v)}" class="${mode === v ? 'on' : ''}"${off ? ' disabled' : ''}>${label}</button>`;
   const bar = (c) => clamp(((c - 10) / 15) * 100, 4, 100);
+  const isBoosting = (id, real) => opt(`boost:${id}`, real ? 1 : 0) > 0;
+
+  // main thermostat: boost buttons are always visible
+  const mainBoost = isBoosting('main', main.boost);
+  const mainRow = `<div class="boostrow${mainBoost ? ' on' : ''}">
+      <span>${mainBoost ? `Boost on: heating to ${h.boost.temperature}°` : `Boost heating to ${h.boost.temperature}°`}</span>
+      <div class="bbtns">${mainBoost
+    ? '<button class="btn on" data-cmd="boost:main" data-n="0">Cancel boost</button>'
+    : minutes.map((v) => `<button class="btn" data-cmd="boost:main" data-n="${v}"${off ? ' disabled' : ''}>${durText(v)}</button>`).join('')}</div>
+    </div>`;
+
+  // zones: tap Boost on a tile to pick a duration
+  const zoneTile = (z) => {
+    const boosting = isBoosting(z.id, z.boost);
+    let control;
+    if (boosting) control = `<button class="zb on" data-cmd="boost:${esc(z.id)}" data-n="0">Cancel boost</button>`;
+    else if (openBoost === z.id) {
+      control = `<div class="bmenu">${minutes.map((v) => `<button data-cmd="boost:${esc(z.id)}" data-n="${v}" data-close>${durText(v)}</button>`).join('')}<button class="x" data-act="boostmenu" data-z="${esc(z.id)}" aria-label="Close">✕</button></div>`;
+    } else control = `<button class="zb" data-act="boostmenu" data-z="${esc(z.id)}"${z.mode === 'unavailable' ? ' disabled' : ''}>Boost</button>`;
+    return `<div class="zone${boosting ? ' boosting' : ''}"><small>${esc(z.name)}${boosting ? ' · boost' : ''}</small><b>${z.current === null ? dash : `${fx(z.current, 1)}°`}</b><div class="bar"><div style="width:${z.current === null ? 0 : bar(z.current)}%"></div></div>${control}</div>`;
+  };
+
   const hw = h.hotWater;
-  const hwText = hw.boosting ? 'Boost active' : hw.heatingNow ? 'Heating now' : 'Not heating';
-  const boostBtns = hw.boosting
+  const hwBoost = opt('hotwater.boost', hw.boosting ? 1 : 0) > 0;
+  const hwText = hwBoost ? 'Boost active' : hw.heatingNow ? 'Heating now' : 'Not heating';
+  const hwBtns = hwBoost
     ? '<button class="btn on" data-cmd="hotwater.boost" data-n="0">Cancel boost</button>'
-    : '<button class="btn" data-cmd="hotwater.boost" data-n="30">Boost 30m</button><button class="btn" data-cmd="hotwater.boost" data-n="60">1h</button>';
+    : minutes.map((v) => `<button class="btn" data-cmd="hotwater.boost" data-n="${v}">${v === minutes[0] ? 'Boost ' : ''}${durText(v)}</button>`).join('');
 
   setHTML($('#heating'), `
     <div class="hd"><h2>Heating &amp; hot water</h2><span class="tag">Hive</span></div>
@@ -247,41 +283,275 @@ function renderHeating(m) {
       <div class="stepper"><button data-act="step" data-d="-0.5" aria-label="Lower target"${off ? ' disabled' : ''}>−</button><div><b>${target === null ? dash : `${fx(target, 1)}°`}</b><small>target</small></div><button data-act="step" data-d="0.5" aria-label="Raise target"${off ? ' disabled' : ''}>+</button></div>
     </div>
     <div class="seg">${modeBtn('Off', h.modes.off)}${modeBtn('Schedule', h.modes.schedule)}${modeBtn('Heat', h.modes.heat)}</div>
-    <div class="zones">${h.zones.map((z) => `<div class="zone"><small>${esc(z.name)}</small><b>${z.current === null ? dash : `${fx(z.current, 1)}°`}</b><div class="bar"><div style="width:${z.current === null ? 0 : bar(z.current)}%"></div></div></div>`).join('')}</div>
+    ${mainRow}
+    <div class="zones">${h.zones.map(zoneTile).join('')}</div>
     <div class="hw">
       <div class="l"><div class="ico">${icon('drop')}</div><div><b>Hot water</b><div class="sub" style="font-size:12px">${hwText}${hw.mode ? ` · ${esc(hw.mode)}` : ''}</div></div></div>
-      <div style="display:flex;gap:8px">${boostBtns}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${hwBtns}</div>
     </div>`);
 }
 
+// ---------- all plugs and lights (each switched on its own; there is deliberately no "all" button) ----------
+let plugFilter = '';
+
+function buildDevices() {
+  $('#plugs').innerHTML = `
+    <div class="hd"><h2>Plugs</h2><span class="tag" id="plug-count"></span></div>
+    <input class="filter" id="plug-filter" type="search" placeholder="Filter plugs, e.g. kitchen or TV" aria-label="Filter plugs" autocomplete="off">
+    <div class="dgroups" id="plug-rows"></div>`;
+  $('#lights').innerHTML = `
+    <div class="hd"><h2>Lights</h2><span class="tag" id="light-count"></span></div>
+    <div class="dgroups" id="light-rows"></div>`;
+  $('#plug-filter').addEventListener('input', (e) => { plugFilter = e.target.value.trim().toLowerCase(); if (model) renderPlugs(model); });
+}
+
+const LOCK_TEXT = { protected: 'Protected: stays on', network: 'Network or camera power: locked' };
+
+function deviceRow(item, kind) {
+  const unavailable = item.state === 'unavailable';
+  const on = opt(`${kind}:${item.id}`, item.state) === 'on';
+  const locked = !!item.lock;
+  const sub = unavailable ? 'Unavailable'
+    : locked ? `${LOCK_TEXT[item.lock] || 'Locked'}${item.watts !== null && item.watts !== undefined ? ` · ${fx(item.watts, 1)} W` : ''}`
+      : on && item.watts !== null && item.watts !== undefined ? `On · ${fx(item.watts, 1)} W` : on ? 'On' : 'Off';
+  const sw = item.control && !unavailable
+    ? `<button class="sw${on ? ' on' : ''}" data-cmd="${kind}:${esc(item.id)}" data-toggle data-name="${esc(item.name)}" data-watts="${item.watts ?? 0}" aria-label="${esc(item.name)}"></button>`
+    : `<button class="sw${on ? ' on' : ''} lock" disabled title="${esc(locked ? (LOCK_TEXT[item.lock] || 'Locked') : 'Unavailable')}"></button>`;
+  const ico = locked ? 'lock' : kind === 'light' ? 'bulb' : 'plug';
+  return `<div class="drow${unavailable ? ' off' : ''}"><div class="ico">${icon(ico)}</div><div class="dn"><b>${esc(item.name)}</b><small>${esc(sub)}</small></div>${sw}</div>`;
+}
+
+function groupsHtml(groups, kind, filter) {
+  return groups.map((g) => {
+    const items = filter ? g.items.filter((i) => `${i.name} ${g.name}`.toLowerCase().includes(filter)) : g.items;
+    if (!items.length) return '';
+    const onCount = items.filter((i) => i.state === 'on').length;
+    return `<div class="dgroup"><div class="dgh"><span>${esc(g.name)}</span><small>${onCount} of ${items.length} on</small></div>${items.map((i) => deviceRow(i, kind)).join('')}</div>`;
+  }).join('');
+}
+
+function countText(groups) {
+  const all = groups.flatMap((g) => g.items).filter((i) => i.state !== 'unavailable');
+  return `${all.filter((i) => i.state === 'on').length} of ${all.length} on`;
+}
+
+function renderPlugs(m) {
+  const html = groupsHtml(m.catalogue.plugs, 'plug', plugFilter);
+  setHTML($('#plug-rows'), html || '<div class="empty">No plugs match that filter.</div>');
+  $('#plug-count').textContent = countText(m.catalogue.plugs);
+}
+
+function renderLights(m) {
+  setHTML($('#light-rows'), groupsHtml(m.catalogue.lights, 'light', ''));
+  $('#light-count').textContent = countText(m.catalogue.lights);
+}
+
+// ---------- security + live cameras ----------
+// The camera tiles are built once and then only updated in place, so a redraw never tears down a playing video.
+let currentView = 'overview';
+const camTiles = new Map(); // camera id -> { el, view, video, msg, label, status, sw, stream, manual, alert }
+
+const STREAM_TEXT = {
+  idle: 'Tap to watch live',
+  connecting: 'Connecting… this can take 15 seconds',
+  live: '',
+  error: 'Stream unavailable, retrying…',
+  demo: 'Demo mode: no live video',
+};
+
+class CamStream {
+  constructor(id, video, onState) {
+    this.id = id;
+    this.video = video;
+    this.onState = onState;
+    this.active = false;
+    this.state = 'idle';
+    this.hls = null;
+    this.retryTimer = null;
+    this.watchdog = null;
+    this.delay = 4000;
+    video.addEventListener('playing', () => { this.delay = 4000; clearTimeout(this.watchdog); this.set('live'); });
+    video.addEventListener('waiting', () => { if (this.active && this.state === 'live') this.set('connecting'); });
+  }
+
+  set(state) { this.state = state; this.onState(state); }
+
+  start() {
+    if (this.active) return;
+    this.active = true;
+    this.set('connecting');
+    this.connect();
+  }
+
+  stop() {
+    if (!this.active && this.state === 'idle') return;
+    this.active = false;
+    clearTimeout(this.retryTimer);
+    clearTimeout(this.watchdog);
+    this.teardown();
+    this.set('idle');
+  }
+
+  retryNow() { if (this.active) { this.teardown(); this.set('connecting'); this.connect(); } }
+
+  teardown() {
+    if (this.hls) { this.hls.destroy(); this.hls = null; }
+    this.video.pause();
+    this.video.removeAttribute('src');
+    this.video.load();
+  }
+
+  async connect() {
+    try {
+      const res = await fetch(`/api/camera/${encodeURIComponent(this.id)}/stream`);
+      if (res.status === 401) { location.href = '/login'; return; }
+      const body = await res.json().catch(() => ({}));
+      if (!this.active) return;
+      if (body.demo) { this.set('demo'); return; }
+      if (!res.ok || !body.url) throw new Error(body.error || `HTTP ${res.status}`);
+      this.play(body.url);
+    } catch (err) {
+      this.fail(err.message);
+    }
+  }
+
+  play(url) {
+    const v = this.video;
+    this.teardown();
+    // The first connection makes Home Assistant start the stream, which can take ~15s. Give up and retry after 50s.
+    clearTimeout(this.watchdog);
+    this.watchdog = setTimeout(() => this.fail('timed out'), 50_000);
+    // Prefer hls.js: recent Chrome/Edge claim native HLS support but cannot parse Home Assistant's low-latency streams.
+    // Native playback is only the fallback (older iPhones without Media Source support).
+    if (window.Hls && window.Hls.isSupported()) {
+      this.hls = new window.Hls({ lowLatencyMode: true, manifestLoadingTimeOut: 30_000, levelLoadingTimeOut: 30_000, fragLoadingTimeOut: 30_000 });
+      this.hls.on(window.Hls.Events.ERROR, (_e, data) => { if (data.fatal) this.fail(data.details); });
+      this.hls.loadSource(url);
+      this.hls.attachMedia(v);
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = url;
+    } else {
+      this.fail('This browser cannot play live video');
+      return;
+    }
+    v.play().catch(() => {});
+  }
+
+  fail() {
+    if (!this.active) return;
+    clearTimeout(this.watchdog);
+    this.teardown();
+    this.set('error');
+    clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => { if (this.active) { this.set('connecting'); this.connect(); } }, this.delay);
+    this.delay = Math.min(this.delay * 2, 30_000);
+  }
+}
+
+function buildSecurity() {
+  $('#security').innerHTML = `
+    <div class="hd"><h2>Security</h2><span id="sec-tag"></span></div>
+    <div class="bells" id="sec-bells"></div>
+    <div class="cams" id="cams"></div>
+    <div class="sub" style="margin-top:12px;font-size:12px">Toggles are floodlights. Live video plays straight from your Home Assistant to this screen and only runs while you are looking at it. Tap a live picture for full screen.</div>`;
+  $('#cams').addEventListener('click', (e) => {
+    const view = e.target.closest('.view');
+    if (!view) return;
+    const t = camTiles.get(view.closest('.cam').dataset.cam);
+    if (!t) return;
+    if (t.stream.state === 'live') {
+      const v = t.video;
+      if (document.fullscreenElement) document.exitFullscreen();
+      else if (v.requestFullscreen) v.requestFullscreen().catch(() => {});
+      else if (v.webkitEnterFullscreen) v.webkitEnterFullscreen();
+    } else if (t.stream.state === 'error') {
+      t.stream.retryNow();
+    } else if (!t.stream.active) {
+      t.manual = true;
+      syncStreams();
+    }
+  });
+  $('#cams').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('view')) { e.preventDefault(); e.target.click(); } });
+}
+
+function ensureCamTiles(cameras) {
+  const host = $('#cams');
+  let created = false;
+  for (const c of cameras) {
+    if (camTiles.has(c.id)) continue;
+    created = true;
+    const el = document.createElement('div');
+    el.className = 'cam';
+    el.dataset.cam = c.id;
+    el.innerHTML = `
+      <div class="view" role="button" tabindex="0" aria-label="Watch ${esc(c.name)} live">
+        <video muted playsinline autoplay></video>
+        <span class="live"></span>
+        ${icon('cam')}
+        <div class="vmsg"></div>
+      </div>
+      <div class="m"><div><b>${esc(c.name)}</b><small class="cstat"></small></div><span class="swslot"></span></div>`;
+    host.appendChild(el);
+    const t = { el, video: el.querySelector('video'), msg: el.querySelector('.vmsg'), label: el.querySelector('.live'), status: el.querySelector('.cstat'), sw: el.querySelector('.swslot'), manual: false, alert: false };
+    t.stream = new CamStream(c.id, t.video, (state) => { updateCamTile(t); });
+    camTiles.set(c.id, t);
+    updateCamTile(t);
+  }
+  if (created) syncStreams();
+}
+
+function updateCamTile(t) {
+  const st = t.stream.state;
+  t.el.classList.toggle('playing', st === 'live');
+  t.msg.textContent = STREAM_TEXT[st] || '';
+  t.label.textContent = t.alert ? 'ALERT' : st === 'live' ? 'LIVE' : '';
+  t.label.style.display = t.label.textContent ? '' : 'none';
+}
+
+// Streams run only while someone is actually looking: the Security tab (all four), or a tile tapped on the overview.
+function syncStreams() {
+  const visible = document.visibilityState === 'visible';
+  const securityShown = !$('#security').hidden;
+  for (const t of camTiles.values()) {
+    const want = visible && securityShown && (currentView === 'security' || t.manual);
+    if (want) t.stream.start(); else t.stream.stop();
+  }
+}
+document.addEventListener('visibilitychange', syncStreams);
+window.addEventListener('pagehide', () => { for (const t of camTiles.values()) t.stream.stop(); });
+
 function renderSecurity(m) {
   const s = m.security;
+  ensureCamTiles(s.cameras);
   const bellDetect = (d) => (d.motion && d.person ? 'Motion & person detection on' : d.motion ? 'Motion detection on' : d.person ? 'Person detection on' : 'Detection off');
   const status = (c) => (c.status === 'clear' ? 'Clear' : `${c.status[0].toUpperCase()}${c.status.slice(1)} detected`);
-  setHTML($('#security'), `
-    <div class="hd"><h2>Security</h2>${s.doorbellPressAvailable ? '' : '<span class="tag warn">Doorbell press alerts: not available yet</span>'}</div>
-    <div class="bells">${s.doorbells.map((d) => `
-      <div class="bell"><div class="ico">${icon('bell')}</div><div><b>${esc(d.name)}</b><small>${bellDetect(d)}</small></div><div class="batt">${d.battery === null ? dash : `${d.battery}%`}<br><small style="color:var(--mute)">battery</small></div></div>`).join('')}
-    </div>
-    <div class="cams">${s.cameras.map((c) => {
-      const on = opt(`floodlight:${c.id}`, c.floodlight ? 'on' : 'off') === 'on';
-      return `<div class="cam${c.status === 'clear' ? '' : ' alert'}"><div class="view"><span class="live">${c.status === 'clear' ? 'LIVE' : 'ALERT'}</span>${icon('cam')}</div>
-        <div class="m"><div><b>${esc(c.name)}</b><small>${status(c)}</small></div>${c.floodlightAvailable
-    ? `<button class="sw${on ? ' on' : ''}" data-cmd="floodlight:${esc(c.id)}" data-toggle title="Floodlight" aria-label="${esc(c.name)} floodlight"></button>`
-    : '<button class="sw lock" disabled title="Floodlight unavailable"></button>'}</div></div>`;
-    }).join('')}</div>
-    <div class="sub" style="margin-top:12px;font-size:12px">Toggles are floodlights. Full live video stays in the Reolink app.</div>`);
+
+  setHTML($('#sec-tag'), s.doorbellPressAvailable ? '' : '<span class="tag warn">Doorbell press alerts: not available yet</span>');
+  setHTML($('#sec-bells'), s.doorbells.map((d) => `
+      <div class="bell"><div class="ico">${icon('bell')}</div><div><b>${esc(d.name)}</b><small>${bellDetect(d)}</small></div><div class="batt">${d.battery === null ? dash : `${d.battery}%`}<br><small style="color:var(--mute)">battery</small></div></div>`).join(''));
+
+  for (const c of s.cameras) {
+    const t = camTiles.get(c.id);
+    t.alert = c.status !== 'clear';
+    t.el.classList.toggle('alert', t.alert);
+    t.status.textContent = status(c);
+    const on = opt(`floodlight:${c.id}`, c.floodlight ? 'on' : 'off') === 'on';
+    setHTML(t.sw, c.floodlightAvailable
+      ? `<button class="sw${on ? ' on' : ''}" data-cmd="floodlight:${esc(c.id)}" data-toggle title="Floodlight" aria-label="${esc(c.name)} floodlight"></button>`
+      : '<button class="sw lock" disabled title="Floodlight unavailable"></button>');
+    updateCamTile(t);
+  }
 }
 
 function renderControls(m) {
   setHTML($('#controls'), `
-    <div class="hd"><h2>Quick controls</h2><span class="tag">Tapo plugs</span></div>
+    <div class="hd"><h2>Quick controls</h2><a class="tag" href="#/devices">All plugs &amp; lights →</a></div>
     <div class="dev">${m.devices.map((d) => {
       const unavailable = d.state === 'unavailable';
       const on = opt(`plug:${d.id}`, d.state) === 'on';
       const sub = unavailable ? 'unavailable' : `${d.watts === null ? dash : `${fx(d.watts, 1)} W`}${d.protected ? ' · protected' : ''}`;
       const sw = d.control && !unavailable
-        ? `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle aria-label="${esc(d.name)}"></button>`
+        ? `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle data-name="${esc(d.name)}" data-watts="${d.watts ?? 0}" aria-label="${esc(d.name)}"></button>`
         : `<button class="sw${on ? ' on' : ''} lock" disabled title="${d.protected ? 'Protected: can’t be switched off here' : 'Unavailable'}"></button>`;
       return `<div class="d"><div class="ico">${icon(d.protected ? 'lock' : 'plug')}</div><div><b>${esc(d.name)}</b><small>${sub}</small></div>${sw}</div>`;
     }).join('')}</div>`);
@@ -362,6 +632,8 @@ function renderAll() {
   renderHeating(m);
   renderSecurity(m);
   renderControls(m);
+  renderPlugs(m);
+  renderLights(m);
   renderActivity(m);
   renderConsumers(m);
 }
@@ -388,11 +660,11 @@ function connect() {
 
 // ---------- views (side navigation) ----------
 const VIEWS = {
-  overview: null, // everything
+  overview: ['energy', 'today', 'surplus', 'heating', 'security', 'power', 'controls', 'activity', 'consumers'],
   energy: ['energy', 'today', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],
-  devices: ['surplus', 'controls', 'consumers'],
+  devices: ['plugs', 'lights', 'surplus', 'consumers'],
   reports: ['power', 'today'],
 };
 const VIEW_TITLES = { overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', devices: 'Devices', reports: 'Reports' };
@@ -401,16 +673,21 @@ function setView(name) {
   if (!Object.prototype.hasOwnProperty.call(VIEWS, name)) name = 'overview';
   const show = VIEWS[name];
   document.querySelector('.grid').dataset.view = name;
+  currentView = name;
+  for (const t of camTiles.values()) t.manual = false;
   document.querySelectorAll('.grid > .card').forEach((c) => { c.hidden = !!show && !show.includes(c.id); });
   document.querySelectorAll('nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === name));
   document.title = name === 'overview' ? 'Home Control' : `${VIEW_TITLES[name]} · Home Control`;
   window.scrollTo(0, 0);
   requestAnimationFrame(drawChart); // the chart needs a visible container to measure its width
+  syncStreams();
 }
 const viewFromHash = () => location.hash.replace(/^#\/?/, '');
 window.addEventListener('hashchange', () => setView(viewFromHash()));
 
 buildEnergy();
+buildDevices();
+buildSecurity();
 buildPower();
 setView(viewFromHash());
 connect();

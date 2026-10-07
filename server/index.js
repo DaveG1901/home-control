@@ -10,7 +10,7 @@ const { HAClient } = require('./ha');
 const { Store } = require('./state');
 const { History } = require('./history');
 const { createAuth } = require('./auth');
-const { buildCommands } = require('./entities');
+const { buildCommands, cameras } = require('./entities');
 const { createFakeHa } = require('./fakeHa');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -68,13 +68,17 @@ async function start(config = defaultConfig) {
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
 
+  // Live camera video is fetched by the browser straight from Home Assistant, so that origin must be allowed in the CSP.
+  let haOrigin = '';
+  if (config.mode === 'live') { try { haOrigin = new URL(config.haUrl).origin; } catch { /* validated elsewhere */ } }
+
   app.use((req, res, next) => {
     const host = req.headers.host || '';
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy',
-      `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' ws://${host} wss://${host}; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
+      `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' ws://${host} wss://${host} ${haOrigin}; media-src 'self' blob: ${haOrigin}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
     next();
   });
   app.use(express.json({ limit: '10kb' }));
@@ -93,6 +97,29 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   });
 
   app.get('/api/state', (req, res) => res.json(store.viewModel()));
+
+  // The HLS player library, served from node_modules (only this one file).
+  app.get('/vendor/hls.min.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'node_modules', 'hls.js', 'dist', 'hls.min.js'), { maxAge: '7d' }));
+
+  // Hands the browser a live-stream address for one of the named cameras. The video itself never passes through this server.
+  const camById = new Map(cameras.map((c) => [c.id, c]));
+  let streamCount = 0;
+  setInterval(() => { streamCount = 0; }, 60_000).unref();
+  app.get('/api/camera/:id/stream', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const cam = camById.get(req.params.id);
+    if (!cam) return res.status(404).json({ error: 'Unknown camera' });
+    if (config.mode === 'demo') return res.json({ demo: true });
+    if (!store.haConnected) return res.status(503).json({ error: 'Home Assistant is not connected' });
+    if (++streamCount > 120) return res.status(429).json({ error: 'Slow down' });
+    try {
+      const p = await ha.cameraStream(cam.stream);
+      return res.json({ url: `${config.haUrl}${p}` });
+    } catch (err) {
+      console.error(`[camera] ${cam.id} stream failed:`, err.message);
+      return res.status(502).json({ error: err.message });
+    }
+  });
 
   app.get('/api/history', (req, res) => {
     const floor = Date.now() - 48 * 3600_000;

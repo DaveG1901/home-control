@@ -51,7 +51,10 @@ const heating = {
   },
   target: { min: 5, max: 25, step: 0.5 },
   modes: { off: 'off', schedule: 'auto', heat: 'heat' }, // UI label -> HA hvac_mode
+  boost: { temperature: 21, minutes: [30, 60, 120] },      // a zone boost heats to this temperature for the chosen time
 };
+
+const hms = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}:00`;
 
 const doorbells = [
   { id: 'front', name: 'Front doorbell', battery: 'sensor.front_doorbell_battery', motion: 'switch.front_doorbell_motion_detection', person: 'switch.front_doorbell_person_detection' },
@@ -64,26 +67,92 @@ const cameras = ['front_garden', 'back_garden', 'garage', 'garage_back'].map((k)
   const kinds = ['person', 'vehicle', 'animal', 'motion'];
   const detect = {};
   for (const kind of kinds) detect[kind] = [`binary_sensor.${k}_camera_${kind}`, `binary_sensor.${k}_camera_${kind}_2`];
-  return { id: k, name: names[k], floodlight: `light.${k}_camera_floodlight`, detect };
+  return { id: k, name: names[k], stream: `camera.${k}_camera_fluent`, floodlight: `light.${k}_camera_floodlight`, detect };
 });
 
-// power: sensor in watts. control: may be switched from the dashboard. protected: never switchable.
+// Every smart plug. power = sensor in watts (null if none). A plug with a `lock` can never be switched from the app:
+//   'protected' = switching it off could do real harm (freezer, critical office power)
+//   'network'   = powers a router / camera / powerline adapter: switching it off would cut your own way back in
+const plug = (group, id, name, sw, power, lock = null) => ({
+  group, id, name,
+  switch: `switch.${sw}`,
+  power: power ? `sensor.${power}` : null,
+  control: !lock,
+  protected: !!lock,
+  lock,
+});
+
 const plugs = [
-  { id: 'dishwasher', name: 'Dishwasher', switch: 'switch.dishwasher', power: 'sensor.dishwasher_current_consumption', control: true },
-  { id: 'tumble_dryer', name: 'Tumble dryer', switch: 'switch.tumble_dryer', power: 'sensor.tumble_dryer_current_consumption', control: true },
-  { id: 'garage_heater', name: 'Garage heater', switch: 'switch.garage_heater', power: 'sensor.garage_heater_current_consumption', control: true },
-  { id: 'purifier', name: 'Air purifier', switch: 'switch.purifier', power: 'sensor.purifier_current_consumption', control: true },
-  { id: 'kids_laptops', name: 'Kids laptops', switch: 'switch.kids_laptops', power: 'sensor.kids_laptops_current_consumption', control: true },
-  { id: 'freezer', name: 'Garage freezer', switch: 'switch.garage_freezer_plug', power: 'sensor.garage_freezer_plug_current_consumption', protected: true },
-  { id: 'office_critical', name: 'Office critical power', switch: 'switch.office_critical_plug', power: 'sensor.office_critical_plug_current_consumption', protected: true },
-  // measured only (shown under "biggest consumers")
-  { id: 'michelle_office', name: 'Michelle office', switch: 'switch.michelle_office_power_1', power: 'sensor.michelle_office_power_1_current_consumption' },
-  { id: 'dave_desk', name: 'Dave office desk', switch: 'switch.office_dave_desk_power', power: 'sensor.office_dave_desk_power_current_consumption' },
-  { id: 'tv', name: 'TV plug', switch: 'switch.tv_plug', power: 'sensor.tv_plug_current_consumption' },
-  { id: 'garage_extension', name: 'Garage extension', switch: 'switch.garage_extension', power: 'sensor.garage_extension_current_consumption' },
-  { id: 'washing_machine', name: 'Washing machine', switch: 'switch.washing_machine', power: 'sensor.washing_machine_current_consumption' },
-  { id: 'living_extension', name: 'Living room extension', switch: 'switch.living_room_extension', power: 'sensor.living_room_extension_current_consumption' },
+  plug('Kitchen & utility', 'dishwasher', 'Dishwasher', 'dishwasher', 'dishwasher_current_consumption'),
+  plug('Kitchen & utility', 'washing_machine', 'Washing machine', 'washing_machine', 'washing_machine_current_consumption'),
+  plug('Kitchen & utility', 'tumble_dryer', 'Tumble dryer', 'tumble_dryer', 'tumble_dryer_current_consumption'),
+  plug('Kitchen & utility', 'microwave', 'Microwave', 'microwave', 'microwave_current_consumption'),
+  plug('Kitchen & utility', 'kitchen_dryer', 'Kitchen dryer plug', 'kitchen_dryer_plug', 'kitchen_dryer_plug_current_consumption'),
+  plug('Kitchen & utility', 'kitchen_charger', 'Kitchen charger plug', 'kitchen_charger_plug', 'kitchen_charger_plug_current_consumption'),
+  plug('Kitchen & utility', 'kitchen_radio', 'Kitchen radio', 'kitchen_extension_kitchen_radio', 'kitchen_radio_current_consumption'),
+  plug('Kitchen & utility', 'kitchen_lamp', 'Kitchen lamp', 'kitchen_extension_smart_plug_2', 'kitchen_lamp_current_consumption'),
+  plug('Kitchen & utility', 'kitchen_plug_1', 'Kitchen extension plug 1', 'kitchen_extension_smart_plug_1', 'unnamed_p304m_smart_plug_1_current_consumption'),
+  plug('Kitchen & utility', 'purifier', 'Air purifier', 'purifier', 'purifier_current_consumption'),
+
+  plug('Garage', 'garage_heater', 'Garage heater', 'garage_heater', 'garage_heater_current_consumption'),
+  plug('Garage', 'garage_charger', 'Garage charger plug', 'garage_charger_plug', 'garage_charger_plug_current_consumption'),
+  plug('Garage', 'garage_extension', 'Garage extension', 'garage_extension', 'garage_extension_current_consumption'),
+  plug('Garage', 'freezer', 'Garage freezer', 'garage_freezer_plug', 'garage_freezer_plug_current_consumption', 'protected'),
+
+  plug('Living areas', 'lamp_plug', 'Living room lamp', 'lamp_plug', 'lamp_plug_device_power'),
+  plug('Living areas', 'living_big_lamp', 'Living room big lamp', 'living_room_big_lamp', 'living_room_big_lamp_current_consumption'),
+  plug('Living areas', 'living_extension', 'Living room extension', 'living_room_extension', 'living_room_extension_current_consumption'),
+  plug('Living areas', 'tv', 'TV plug', 'tv_plug', 'tv_plug_current_consumption'),
+  plug('Living areas', 'downstairs_hall', 'Downstairs hall plug', 'downstairs_hall_plug', 'downstairs_hall_plug_power'),
+  plug('Living areas', 'upstairs_hall', 'Upstairs hall plug', 'upstairs_hall_plug', 'upstairs_hall_plug_power_2'),
+
+  plug('Bedrooms', 'dave_tv', 'Dave TV plug', 'dave_tv_plug', 'dave_tv_plug_current_consumption'),
+  plug('Bedrooms', 'eleanor_bedside', 'Eleanor bedside plug', 'eleanor_bedside_plug', 'eleanor_bedside_plug_current_consumption'),
+  plug('Bedrooms', 'eleanor_cupboard', 'Eleanor cupboard plugs', 'eleanor_cupboard_plugs', 'eleanor_cupboard_plugs_current_consumption'),
+  plug('Bedrooms', 'eleanor_tv', 'Eleanor TV', 'eleanor_tv', 'eleanor_tv_current_consumption'),
+  plug('Bedrooms', 'kasper_bedside', 'Kasper bedside plug', 'kasper_bedside_plug', 'kasper_bedside_plug_current_consumption'),
+  plug('Bedrooms', 'kasper_tv', 'Kasper TV', 'kasper_tv', 'kasper_tv_current_consumption'),
+  plug('Bedrooms', 'kids_laptops', 'Kids laptops', 'kids_laptops', 'kids_laptops_current_consumption'),
+
+  plug('Office', 'michelle_office', 'Michelle office power', 'michelle_office_power_1', 'michelle_office_power_1_current_consumption'),
+  plug('Office', 'michelle_office_2', 'Michelle spare office power', 'michelle_office_power_2', 'michelle_office_power_2_current_consumption'),
+  plug('Office', 'dave_desk', 'Dave office desk', 'office_dave_desk_power', 'office_dave_desk_power_current_consumption'),
+  plug('Office', 'office_critical', 'Office critical power', 'office_critical_plug', 'office_critical_plug_current_consumption', 'protected'),
+
+  plug('Network & cameras', 'router_dave', 'Router plug (Dave bedroom)', 'dave_bedroom_plug_1', 'dave_bedroom_plug_1_current_consumption', 'network'),
+  plug('Network & cameras', 'router_kitchen', 'Kitchen router', 'kitchen_extension_kitchen_router', 'kitchen_router_current_consumption', 'network'),
+  plug('Network & cameras', 'router_garage', 'Garage router', 'garage_camera_powerline', 'garage_camera_powerline_current_consumption', 'network'),
+  plug('Network & cameras', 'cam_front_poe', 'Front camera PoE', 'front_camera_poe', 'front_camera_poe_current_consumption', 'network'),
+  plug('Network & cameras', 'cam_front_poe_2', 'Front camera PoE (second plug)', 'front_camera_poe_2', 'front_camera_poe_current_consumption_2', 'network'),
+  plug('Network & cameras', 'cam_front_powerline', 'Front camera powerline', 'front_camera_powerline', null, 'network'),
+  plug('Network & cameras', 'cam_garden_powerline', 'Garden camera powerline', 'garden_camera_powerline', 'garden_camera_powerline_current_consumption', 'network'),
 ];
+
+// House lights (camera floodlights live on the Security card; access-point and switch LEDs are left out on purpose).
+const light = (group, id, name, entity) => ({ group, id, name, light: `light.${entity}` });
+const lights = [
+  light('Living areas', 'living_bulb_1', 'Living room bulb 1', 'smart_bulb'),
+  light('Living areas', 'living_bulb_2', 'Living room bulb 2', 'living_room_bulb_2'),
+  light('Living areas', 'living_bulb_3', 'Living room bulb 3 (named "Eleanor" in HA)', 'living_room_bulb_1'),
+  light('Living areas', 'downstairs_hall', 'Downstairs hall', 'downstairs_hall_light'),
+  light('Living areas', 'upstairs_hall', 'Upstairs hall', 'upstairs_hall_light'),
+  light('Living areas', 'lobby', 'Lobby', 'lobby_light'),
+  light('Bedrooms', 'dave_light', 'Dave light', 'dave_light'),
+  light('Bedrooms', 'dave_bulb', 'Dave bulb', 'dave_bedroom_bulb'),
+  light('Bedrooms', 'eleanor_light', 'Eleanor light', 'eleanor_light'),
+  light('Bedrooms', 'kasper_light', 'Kasper light', 'kasper_bedroom_light'),
+  light('Bedrooms', 'kasper_bulb', 'Kasper bulb', 'kasper_bulb'),
+  light('Bedrooms', 'michelle_light', 'Michelle bedroom light', 'michelle_bedroom_light'),
+  light('Office', 'office_light', 'Office light', 'office_light'),
+  light('Office', 'office_bulb', 'Office bulb', 'office_bulb'),
+];
+
+// Group items in the order they first appear, e.g. for the Devices page.
+const groupBy = (list) => {
+  const map = new Map();
+  for (const item of list) { if (!map.has(item.group)) map.set(item.group, []); map.get(item.group).push(item); }
+  return [...map].map(([name, items]) => ({ name, items }));
+};
 
 // Appliances offered on the "Solar surplus" card, with their typical draw in kW.
 // Must be plugs above with control: true. Switching a plug only powers the socket: the appliance itself still needs starting.
@@ -114,6 +183,15 @@ function buildCommands() {
     });
   }
 
+  for (const l of lights) {
+    cmds.set(`light:${l.id}`, {
+      label: l.name,
+      validate: onOff,
+      call: (v) => ({ domain: 'light', service: v === 'on' ? 'turn_on' : 'turn_off', data: { entity_id: l.light } }),
+      describe: (v) => `${l.name} switched ${v}`,
+    });
+  }
+
   for (const c of cameras) {
     cmds.set(`floodlight:${c.id}`, {
       label: `${c.name} floodlight`,
@@ -136,15 +214,29 @@ function buildCommands() {
     call: (v) => ({ domain: 'climate', service: 'set_hvac_mode', data: { entity_id: h.main.climate, hvac_mode: v } }),
     describe: (v) => `Heating mode set to ${v === 'auto' ? 'schedule' : v}`,
   });
-  // NOTE: the Hive boost service name/fields should be confirmed in HA (Developer Tools > Actions).
+  // hive.boost_hot_water: fields entity_id, on_off, time_period (confirmed against this Home Assistant).
+  const boostMinutes = (v) => v === 0 || h.boost.minutes.includes(v);
+  const minutesText = (m) => (m % 60 === 0 ? `${m / 60} h` : `${m} min`);
   cmds.set('hotwater.boost', {
     label: 'Hot water boost',
-    validate: (v) => v === 0 || v === 30 || v === 60,
+    validate: boostMinutes,
     call: (v) => (v === 0
       ? { domain: 'hive', service: 'boost_hot_water', data: { entity_id: h.hotWater.waterHeater, on_off: 'off' } }
-      : { domain: 'hive', service: 'boost_hot_water', data: { entity_id: h.hotWater.waterHeater, on_off: 'on', time_period: `00:${String(v).padStart(2, '0')}:00` } }),
-    describe: (v) => (v === 0 ? 'Hot water boost cancelled' : `Hot water boost for ${v} min`),
+      : { domain: 'hive', service: 'boost_hot_water', data: { entity_id: h.hotWater.waterHeater, on_off: 'on', time_period: hms(v) } }),
+    describe: (v) => (v === 0 ? 'Hot water boost cancelled' : `Hot water boost for ${minutesText(v)}`),
   });
+
+  // Heating boost for the main thermostat and for every zone: hive.boost_heating_on / boost_heating_off.
+  for (const z of [h.main, ...h.zones]) {
+    cmds.set(`boost:${z.id}`, {
+      label: `${z.name} boost`,
+      validate: boostMinutes,
+      call: (v) => (v === 0
+        ? { domain: 'hive', service: 'boost_heating_off', data: { entity_id: z.climate } }
+        : { domain: 'hive', service: 'boost_heating_on', data: { entity_id: z.climate, time_period: hms(v), temperature: h.boost.temperature } }),
+      describe: (v) => (v === 0 ? `${z.name} boost cancelled` : `${z.name} boosted to ${h.boost.temperature}° for ${minutesText(v)}`),
+    });
+  }
 
   return cmds;
 }
@@ -157,8 +249,9 @@ function watchedEntities() {
   Object.values(heating.hotWater).forEach((e) => set.add(e));
   for (const d of doorbells) { set.add(d.battery); set.add(d.motion); set.add(d.person); }
   for (const c of cameras) { set.add(c.floodlight); Object.values(c.detect).flat().forEach((e) => set.add(e)); }
-  for (const p of plugs) { set.add(p.switch); set.add(p.power); }
+  for (const p of plugs) { set.add(p.switch); if (p.power) set.add(p.power); }
+  for (const l of lights) set.add(l.light);
   return set;
 }
 
-module.exports = { energy, environment, heating, doorbells, cameras, plugs, quickControls, surplusDevices, buildCommands, watchedEntities };
+module.exports = { energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, quickControls, surplusDevices, buildCommands, watchedEntities };

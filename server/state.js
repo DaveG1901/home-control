@@ -148,6 +148,8 @@ class Store extends EventEmitter {
       target: round(this.attr(z.climate, 'temperature'), 1),
       mode: this.str(z.climate) || 'unavailable',
       modes: this.attr(z.climate, 'hvac_modes') || [],
+      boost: this.attr(z.climate, 'preset_mode') === 'boost',
+      hvacAction: this.attr(z.climate, 'hvac_action'),
     });
     const hw = E.heating.hotWater;
     const heating = {
@@ -156,6 +158,7 @@ class Store extends EventEmitter {
       hotWater: { heatingNow: this.isOn(hw.heatingNow), boosting: this.isOn(hw.boosting), mode: this.str(hw.mode) || this.str(hw.waterHeater) },
       limits: E.heating.target,
       modes: E.heating.modes,
+      boost: E.heating.boost,
     };
 
     const security = {
@@ -173,18 +176,28 @@ class Store extends EventEmitter {
 
     const plugState = (p) => {
       const e = this.raw(p.switch);
-      return { id: p.id, name: p.name, state: e ? e.state : 'unavailable', watts: round(n(p.power), 1), protected: !!p.protected, control: !!p.control && !p.protected };
+      return { id: p.id, name: p.name, state: e ? e.state : 'unavailable', watts: round(n(p.power), 1), protected: !!p.protected, lock: p.lock || null, control: !!p.control && !p.protected };
     };
     const byId = new Map(E.plugs.map((p) => [p.id, p]));
     const devices = E.quickControls.map((id) => plugState(byId.get(id)));
     const consumers = E.plugs.map(plugState).filter((p) => p.watts && p.watts > 0.5).sort((a, b) => b.watts - a.watts).slice(0, 7).map((p) => ({ name: p.name, watts: p.watts }));
+
+    // Everything switchable, grouped for the Devices page. Locked plugs are listed (read-only) so nothing is hidden.
+    const lightState = (l) => {
+      const e = this.raw(l.light);
+      return { id: l.id, name: l.name, state: e ? e.state : 'unavailable', control: true };
+    };
+    const catalogue = {
+      plugs: E.groupBy(E.plugs).map((g) => ({ name: g.name, items: g.items.map(plugState) })),
+      lights: E.groupBy(E.lights).map((g) => ({ name: g.name, items: g.items.map(lightState) })),
+    };
 
     const w = this.str(E.environment.weather);
     return {
       ts: Date.now(),
       connection: { mode: this.mode, ha: this.haConnected, ready: this.ready, error: this.fatal },
       environment: { outsideTemp: round(n(E.environment.outsideTemp), 1), weather: w ? WEATHER[w] || w : null },
-      energy, today, heating, security, devices, consumers,
+      energy, today, heating, security, devices, consumers, catalogue,
       surplus: this.surplusModel(plugState, byId),
       activity: this.activity.slice(0, 12),
     };

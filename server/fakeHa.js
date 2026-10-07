@@ -35,7 +35,7 @@ function seed() {
   set('sensor.electricity_maps_co2_intensity', 258);
 
   // Heating (Hive)
-  const climate = (id, cur, target = 7, mode = 'off') => set(id, mode, { current_temperature: cur, temperature: target, hvac_modes: ['off', 'auto', 'heat'] });
+  const climate = (id, cur, target = 7, mode = 'off') => set(id, mode, { current_temperature: cur, temperature: target, hvac_modes: ['off', 'auto', 'heat'], preset_modes: ['boost', 'none'], preset_mode: 'none', hvac_action: 'idle' });
   climate('climate.thermostat', 21.4);
   climate('climate.living_room', 20.6);
   climate('climate.lobby', 19.6);
@@ -57,6 +57,7 @@ function seed() {
 
   // Cameras (each exists twice in the real HA)
   for (const c of ['front_garden', 'back_garden', 'garage', 'garage_back']) {
+    set(`camera.${c}_camera_fluent`, 'idle');
     set(`light.${c}_camera_floodlight`, 'off');
     for (const k of ['person', 'vehicle', 'animal', 'motion']) { set(`binary_sensor.${c}_camera_${k}`, 'off'); set(`binary_sensor.${c}_camera_${k}_2`, 'off'); }
   }
@@ -70,9 +71,22 @@ function seed() {
   plug('purifier', 'on', 5.9); plug('kids_laptops', 'on', 0); plug('garage_freezer_plug', 'on', 69.2);
   plug('office_critical_plug', 'on', 61); plug('michelle_office_power_1', 'on', 54.7); plug('office_dave_desk_power', 'on', 11);
   plug('tv_plug', 'on', 18); plug('garage_extension', 'on', 12.7); plug('washing_machine', 'on', 0); plug('living_room_extension', 'on', 2.4);
+
+  // Anything in the app's config that is not seeded above: plugs default to on, drawing a little
+  const DEFAULT_W = { kitchen_radio: 0, kitchen_lamp: 0, kitchen_plug_1: 12.5, lamp_plug: 0.6, living_big_lamp: 0, downstairs_hall: 0, upstairs_hall: 11, dave_tv: 0, eleanor_bedside: 0, kasper_bedside: 1, kasper_tv: 1.1, router_dave: 6.6, router_kitchen: 0, router_garage: 10.2, cam_front_poe: 8.5, cam_garden_powerline: 2.6 };
+  for (const p of E.plugs) {
+    PLUG_SENSOR[p.switch] = p.power;
+    if (!s[p.switch]) set(p.switch, E_UNAVAILABLE.has(p.id) ? 'unavailable' : 'on');
+    if (p.power && !s[p.power]) set(p.power, DEFAULT_W[p.id] ?? 0, { unit_of_measurement: 'W' });
+  }
+  const lightState = { downstairs_hall: 'unavailable', upstairs_hall: 'unavailable', lobby: 'unavailable', dave_bulb: 'unavailable', kasper_bulb: 'unavailable', michelle_light: 'unavailable', dave_light: 'off', kasper_light: 'off' };
+  for (const l of E.lights) set(l.light, lightState[l.id] || 'on');
   return s;
 }
 
+const E = require('./entities');
+const PLUG_SENSOR = {}; // switch entity -> its power sensor (filled in when the fake is seeded)
+const E_UNAVAILABLE = new Set(['garage_extension', 'eleanor_tv']);
 const NOMINAL_WATTS = { garage_heater: 2000, dishwasher: 1200, tumble_dryer: 2200, washing_machine: 500, kids_laptops: 60, purifier: 5.9, tv_plug: 18 };
 
 async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0, animate = true } = {}) {
@@ -97,7 +111,7 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
 
   function setPlugPower(switchId, on) {
     const name = switchId.replace('switch.', '');
-    const sensorId = `sensor.${name}_current_consumption`;
+    const sensorId = PLUG_SENSOR[switchId] || `sensor.${name}_current_consumption`;
     if (!states[sensorId]) return;
     setState(sensorId, on ? (NOMINAL_WATTS[name] ?? Math.max(1, +states[sensorId].state || 10)) : 0);
   }
@@ -113,6 +127,13 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
     }
     if (domain === 'climate' && service === 'set_temperature') { known(id); setState(id, states[id].state, { ...states[id].attributes, temperature: data.temperature }); return; }
     if (domain === 'climate' && service === 'set_hvac_mode') { known(id); setState(id, data.hvac_mode); return; }
+    if (domain === 'hive' && (service === 'boost_heating_on' || service === 'boost_heating_off')) {
+      known(id);
+      const on = service === 'boost_heating_on';
+      setState(id, states[id].state, { ...states[id].attributes, preset_mode: on ? 'boost' : 'none', hvac_action: on ? 'heating' : 'idle', ...(on ? { temperature: data.temperature } : {}) });
+      if (on) { const m = String(data.time_period || '00:30:00').split(':').map(Number); const t = setTimeout(() => setState(id, states[id].state, { ...states[id].attributes, preset_mode: 'none', hvac_action: 'idle' }), ((m[0] * 60) + m[1]) * 60_000); timers.add(t); }
+      return;
+    }
     if (domain === 'hive' && service === 'boost_hot_water') {
       known(id);
       const on = data.on_off === 'on';
@@ -139,6 +160,9 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
       switch (m.type) {
         case 'ping': ws.send(JSON.stringify({ id: m.id, type: 'pong' })); break;
         case 'get_states': ok(Object.values(states).map(withMeta)); break;
+        case 'camera/stream':
+          if (!states[m.entity_id]) fail('not_found', 'Entity not found'); else ok({ url: '/api/hls/faketoken/master_playlist.m3u8' });
+          break;
         case 'subscribe_events': subscribers.set(ws, m.id); ok(); break;
         case 'call_service':
           try { callService(m.domain, m.service, m.service_data || {}); ok({ context: { id: 'fake' } }); } catch (e) { fail(e.code || 'unknown', e.message); }

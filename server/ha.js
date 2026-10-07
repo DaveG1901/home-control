@@ -158,6 +158,14 @@ class HAClient extends EventEmitter {
     });
   }
 
+  /** Ask HA to start a live HLS stream for a camera. Resolves to a path such as /api/hls/<token>/master_playlist.m3u8 */
+  async cameraStream(entityId) {
+    if (!this.connected) throw new Error('Not connected to Home Assistant');
+    const r = await this._send({ type: 'camera/stream', entity_id: entityId, format: 'hls' });
+    if (!r || typeof r.url !== 'string') throw new Error('Home Assistant did not return a stream address');
+    return r.url;
+  }
+
   /** Call a Home Assistant service, e.g. callService('switch', 'turn_off', { entity_id: 'switch.x' }). */
   callService(domain, service, serviceData = {}) {
     if (!this.connected) return Promise.reject(new Error('Not connected to Home Assistant'));

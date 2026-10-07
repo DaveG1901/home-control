@@ -60,9 +60,9 @@ checking. The problem does not occur on a home network or on Render.
   your `HA_URL` origin only.
 - **Devices tab:** every plug and house light, each switched on its own (there is no all-on/all-off button on purpose).
   Switching off something that is drawing more than 50 W asks first.
-- **Locked plugs:** the freezer and "office critical" plugs (`protected`) and anything that powers a router, powerline or
-  camera PoE (`network`) cannot be switched from the app, because switching them off could do harm or cut your own way back
-  in. To change that, edit the `lock` value in `server/entities.js`.
+- **Plugs that ask first:** every plug can be switched, but the freezer and "office critical" plugs (`critical`) and anything
+  that powers a router, powerline or camera PoE (`network`) ask "are you sure?" before switching OFF, because that could do
+  harm or cut your own way back in. Change or remove the `warn` value on a plug in `server/entities.js`.
 - **Boost:** the main thermostat, each zone and hot water can be boosted for 30 min, 1 h or 2 h (zones heat to
   `heating.boost.temperature`, 21° by default, using `hive.boost_heating_on`). Boost can be cancelled from the same card.
 

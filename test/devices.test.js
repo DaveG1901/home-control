@@ -38,7 +38,7 @@ test('config sanity: ids are unique and every watched entity exists in the seede
   assert.deepEqual(missing, [], 'watched entities missing from the fake HA seed (typo in entities.js, or seed needs updating)');
 });
 
-test('every plug and light is listed once on the Devices page, with the right locks', async (t) => {
+test('every plug and light is listed once on the Devices page, and the risky plugs carry a warning', async (t) => {
   const { state } = await demoApp(t);
   const vm = await state();
   const plugItems = vm.catalogue.plugs.flatMap((g) => g.items);
@@ -46,14 +46,14 @@ test('every plug and light is listed once on the Devices page, with the right lo
   assert.equal(plugItems.length, E.plugs.length);
   assert.equal(lightItems.length, E.lights.length);
   const byId = Object.fromEntries(plugItems.map((p) => [p.id, p]));
-  for (const id of ['freezer', 'office_critical']) assert.equal(byId[id].lock, 'protected', id);
-  for (const id of ['router_dave', 'router_kitchen', 'router_garage', 'cam_front_poe', 'cam_front_powerline']) assert.equal(byId[id].lock, 'network', id);
-  for (const id of ['dishwasher', 'michelle_office', 'dave_desk', 'tv', 'washing_machine']) assert.equal(byId[id].control, true, `${id} should be switchable`);
-  for (const p of plugItems.filter((p) => p.lock)) assert.equal(p.control, false, `${p.id} must not be switchable`);
+  for (const id of ['freezer', 'office_critical']) assert.equal(byId[id].warn, 'critical', id);
+  for (const id of ['router_dave', 'router_kitchen', 'router_garage', 'cam_front_poe', 'cam_front_powerline']) assert.equal(byId[id].warn, 'network', id);
+  for (const id of ['dishwasher', 'michelle_office', 'dave_desk', 'tv', 'washing_machine']) assert.equal(byId[id].warn, null, `${id} needs no warning`);
+  for (const p of plugItems) assert.equal(p.control, true, `${p.id} should be switchable`);
   assert.ok(vm.catalogue.plugs.map((g) => g.name).includes('Network & cameras'));
 });
 
-test('any unlocked plug and any light can be switched, one at a time', async (t) => {
+test('any plug and any light can be switched, one at a time', async (t) => {
   const { app, cmd } = await demoApp(t);
   assert.equal((await cmd('plug:michelle_office', 'off')).status, 200);
   await until(() => app.store.raw('switch.michelle_office_power_1').state === 'off');
@@ -67,16 +67,18 @@ test('any unlocked plug and any light can be switched, one at a time', async (t)
   assert.equal(app.store.raw('light.office_bulb').state, 'on', 'other lights untouched');
 });
 
-test('locked plugs cannot be switched however the request is made', async (t) => {
+test('even the important plugs can be switched (the app only asks for confirmation), but only by their named command', async (t) => {
   const { app, cmd } = await demoApp(t);
-  for (const id of ['freezer', 'office_critical', 'router_dave', 'router_kitchen', 'router_garage', 'cam_front_poe', 'cam_front_poe_2', 'cam_front_powerline', 'cam_garden_powerline']) {
-    assert.equal((await cmd(`plug:${id}`, 'off')).status, 404, id);
+  for (const id of ['freezer', 'office_critical', 'router_dave', 'router_garage', 'cam_front_poe', 'cam_front_powerline']) {
+    assert.equal((await cmd(`plug:${id}`, 'off')).status, 200, id);
   }
-  // nor by raw entity id, nor by a "lights" or "floodlight" prefix trick
-  assert.equal((await cmd('switch.garage_freezer_plug', 'off')).status, 404);
+  await until(() => app.store.raw('switch.garage_freezer_plug').state === 'off');
+  await until(() => app.store.raw('switch.garage_camera_powerline').state === 'off');
+  assert.equal(app.store.raw('switch.dave_tv_plug').state, 'on', 'unrelated plugs untouched');
+  // raw entity ids and path tricks are still refused
+  assert.equal((await cmd('switch.garage_freezer_plug', 'on')).status, 404);
   assert.equal((await cmd('light:../freezer', 'off')).status, 404);
-  assert.equal(app.store.raw('switch.garage_freezer_plug').state, 'on');
-  assert.equal(app.store.raw('switch.garage_camera_powerline').state, 'on');
+  assert.equal(app.store.raw('switch.garage_freezer_plug').state, 'off');
 });
 
 test('heating boost works on the main thermostat and every zone, and can be cancelled', async (t) => {

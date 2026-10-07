@@ -176,7 +176,7 @@ class Store extends EventEmitter {
 
     const plugState = (p) => {
       const e = this.raw(p.switch);
-      return { id: p.id, name: p.name, state: e ? e.state : 'unavailable', watts: round(n(p.power), 1), protected: !!p.protected, lock: p.lock || null, control: !!p.control && !p.protected };
+      return { id: p.id, name: p.name, state: e ? e.state : 'unavailable', watts: round(n(p.power), 1), warn: p.warn || null, control: true };
     };
     const byId = new Map(E.plugs.map((p) => [p.id, p]));
     const devices = E.quickControls.map((id) => plugState(byId.get(id)));

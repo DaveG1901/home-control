@@ -70,16 +70,16 @@ const cameras = ['front_garden', 'back_garden', 'garage', 'garage_back'].map((k)
   return { id: k, name: names[k], stream: `camera.${k}_camera_fluent`, floodlight: `light.${k}_camera_floodlight`, detect };
 });
 
-// Every smart plug. power = sensor in watts (null if none). A plug with a `lock` can never be switched from the app:
-//   'protected' = switching it off could do real harm (freezer, critical office power)
-//   'network'   = powers a router / camera / powerline adapter: switching it off would cut your own way back in
-const plug = (group, id, name, sw, power, lock = null) => ({
+// Every smart plug. power = sensor in watts (null if none). Every plug can be switched from the app.
+// A plug with a `warn` asks "are you sure?" before it is switched OFF:
+//   'critical' = switching it off could do real harm (freezer, critical office power)
+//   'network'  = powers a router / camera / powerline adapter: switching it off could cut your own way back in
+const plug = (group, id, name, sw, power, warn = null) => ({
   group, id, name,
   switch: `switch.${sw}`,
   power: power ? `sensor.${power}` : null,
-  control: !lock,
-  protected: !!lock,
-  lock,
+  control: true,
+  warn,
 });
 
 const plugs = [
@@ -97,7 +97,7 @@ const plugs = [
   plug('Garage', 'garage_heater', 'Garage heater', 'garage_heater', 'garage_heater_current_consumption'),
   plug('Garage', 'garage_charger', 'Garage charger plug', 'garage_charger_plug', 'garage_charger_plug_current_consumption'),
   plug('Garage', 'garage_extension', 'Garage extension', 'garage_extension', 'garage_extension_current_consumption'),
-  plug('Garage', 'freezer', 'Garage freezer', 'garage_freezer_plug', 'garage_freezer_plug_current_consumption', 'protected'),
+  plug('Garage', 'freezer', 'Garage freezer', 'garage_freezer_plug', 'garage_freezer_plug_current_consumption', 'critical'),
 
   plug('Living areas', 'lamp_plug', 'Living room lamp', 'lamp_plug', 'lamp_plug_device_power'),
   plug('Living areas', 'living_big_lamp', 'Living room big lamp', 'living_room_big_lamp', 'living_room_big_lamp_current_consumption'),
@@ -117,7 +117,7 @@ const plugs = [
   plug('Office', 'michelle_office', 'Michelle office power', 'michelle_office_power_1', 'michelle_office_power_1_current_consumption'),
   plug('Office', 'michelle_office_2', 'Michelle spare office power', 'michelle_office_power_2', 'michelle_office_power_2_current_consumption'),
   plug('Office', 'dave_desk', 'Dave office desk', 'office_dave_desk_power', 'office_dave_desk_power_current_consumption'),
-  plug('Office', 'office_critical', 'Office critical power', 'office_critical_plug', 'office_critical_plug_current_consumption', 'protected'),
+  plug('Office', 'office_critical', 'Office critical power', 'office_critical_plug', 'office_critical_plug_current_consumption', 'critical'),
 
   plug('Network & cameras', 'router_dave', 'Router plug (Dave bedroom)', 'dave_bedroom_plug_1', 'dave_bedroom_plug_1_current_consumption', 'network'),
   plug('Network & cameras', 'router_kitchen', 'Kitchen router', 'kitchen_extension_kitchen_router', 'kitchen_router_current_consumption', 'network'),
@@ -174,7 +174,6 @@ function buildCommands() {
   const onOff = (v) => v === 'on' || v === 'off';
 
   for (const p of plugs) {
-    if (!p.control || p.protected) continue;
     cmds.set(`plug:${p.id}`, {
       label: p.name,
       validate: onOff,

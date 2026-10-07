@@ -88,7 +88,8 @@ test('web app: auth, command allowlist, live updates', async (t) => {
   assert.equal(state.connection.mode, 'demo');
   assert.equal(state.heating.zones.length, 8);
   assert.equal(state.security.cameras.length, 4);
-  assert.equal(state.devices.find((d) => d.id === 'freezer').protected, true);
+  assert.equal(state.devices.find((d) => d.id === 'freezer').warn, 'critical');
+  assert.equal(state.devices.find((d) => d.id === 'freezer').control, true);
   assert.equal(state.security.doorbellPressAvailable, false);
   assert.ok(state.today.selfSufficiency !== null);
 
@@ -105,10 +106,9 @@ test('web app: auth, command allowlist, live updates', async (t) => {
   assert.equal((await cmd('hotwater.boost', 30)).status, 200);
   await until(() => app.store.isOn('binary_sensor.hotwater_boost'));
 
-  // protected / unknown / invalid are refused and nothing changes
-  assert.equal((await cmd('plug:freezer', 'off')).status, 404);
-  assert.equal((await cmd('plug:office_critical', 'off')).status, 404);
+  // only named commands exist: a raw Home Assistant entity id is refused, and invalid values are refused; nothing changes
   assert.equal((await cmd('switch.garage_freezer_plug', 'off')).status, 404);
+  assert.equal((await cmd('plug:no_such_plug', 'off')).status, 404);
   assert.equal(app.store.raw('switch.garage_freezer_plug').state, 'on');
   assert.equal((await cmd('heating.target', 99)).status, 400);
   assert.equal((await cmd('heating.target', '21')).status, 400);

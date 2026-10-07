@@ -83,8 +83,13 @@ document.addEventListener('click', (e) => {
   else if (t.dataset.toggle !== undefined) value = t.classList.contains('on') ? 'off' : 'on';
   else value = t.dataset.v;
   if (t.dataset.toggle !== undefined && value === 'off') {
+    const name = t.dataset.name || 'This device';
     const watts = Number(t.dataset.watts) || 0;
-    if (watts > 50 && !window.confirm(`${t.dataset.name || 'This device'} is using ${Math.round(watts)} W right now. Switch it off?`)) return;
+    let question = null;
+    if (t.dataset.warn === 'network') question = `${name} powers your network or cameras. Switching it off could cut your connection, and you may not be able to switch it back on from here. Switch it off?`;
+    else if (t.dataset.warn === 'critical') question = `${name} is marked as important. Switch it off?`;
+    else if (watts > 50) question = `${name} is using ${Math.round(watts)} W right now. Switch it off?`;
+    if (question && !window.confirm(question)) return;
   }
   if (t.hasAttribute('data-close')) openBoost = null;
   let msg;
@@ -305,20 +310,19 @@ function buildDevices() {
   $('#plug-filter').addEventListener('input', (e) => { plugFilter = e.target.value.trim().toLowerCase(); if (model) renderPlugs(model); });
 }
 
-const LOCK_TEXT = { protected: 'Protected: stays on', network: 'Network or camera power: locked' };
+// Plugs marked important ask for confirmation before they are switched off (see the click handler).
+const WARN_NOTE = { critical: 'Important', network: 'Powers network or cameras' };
 
 function deviceRow(item, kind) {
   const unavailable = item.state === 'unavailable';
   const on = opt(`${kind}:${item.id}`, item.state) === 'on';
-  const locked = !!item.lock;
-  const sub = unavailable ? 'Unavailable'
-    : locked ? `${LOCK_TEXT[item.lock] || 'Locked'}${item.watts !== null && item.watts !== undefined ? ` · ${fx(item.watts, 1)} W` : ''}`
-      : on && item.watts !== null && item.watts !== undefined ? `On · ${fx(item.watts, 1)} W` : on ? 'On' : 'Off';
-  const sw = item.control && !unavailable
-    ? `<button class="sw${on ? ' on' : ''}" data-cmd="${kind}:${esc(item.id)}" data-toggle data-name="${esc(item.name)}" data-watts="${item.watts ?? 0}" aria-label="${esc(item.name)}"></button>`
-    : `<button class="sw${on ? ' on' : ''} lock" disabled title="${esc(locked ? (LOCK_TEXT[item.lock] || 'Locked') : 'Unavailable')}"></button>`;
-  const ico = locked ? 'lock' : kind === 'light' ? 'bulb' : 'plug';
-  return `<div class="drow${unavailable ? ' off' : ''}"><div class="ico">${icon(ico)}</div><div class="dn"><b>${esc(item.name)}</b><small>${esc(sub)}</small></div>${sw}</div>`;
+  const hasWatts = item.watts !== null && item.watts !== undefined;
+  const status = on ? `On${hasWatts ? ` · ${fx(item.watts, 1)} W` : ''}` : 'Off';
+  const sub = unavailable ? 'Unavailable' : `${item.warn ? `${WARN_NOTE[item.warn] || 'Important'} · ` : ''}${status}`;
+  const sw = unavailable
+    ? '<button class="sw lock" disabled title="Unavailable"></button>'
+    : `<button class="sw${on ? ' on' : ''}" data-cmd="${kind}:${esc(item.id)}" data-toggle data-name="${esc(item.name)}" data-watts="${item.watts ?? 0}"${item.warn ? ` data-warn="${esc(item.warn)}"` : ''} aria-label="${esc(item.name)}"></button>`;
+  return `<div class="drow${unavailable ? ' off' : ''}"><div class="ico">${icon(kind === 'light' ? 'bulb' : 'plug')}</div><div class="dn"><b>${esc(item.name)}</b><small>${esc(sub)}</small></div>${sw}</div>`;
 }
 
 function groupsHtml(groups, kind, filter) {
@@ -549,11 +553,11 @@ function renderControls(m) {
     <div class="dev">${m.devices.map((d) => {
       const unavailable = d.state === 'unavailable';
       const on = opt(`plug:${d.id}`, d.state) === 'on';
-      const sub = unavailable ? 'unavailable' : `${d.watts === null ? dash : `${fx(d.watts, 1)} W`}${d.protected ? ' · protected' : ''}`;
-      const sw = d.control && !unavailable
-        ? `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle data-name="${esc(d.name)}" data-watts="${d.watts ?? 0}" aria-label="${esc(d.name)}"></button>`
-        : `<button class="sw${on ? ' on' : ''} lock" disabled title="${d.protected ? 'Protected: can’t be switched off here' : 'Unavailable'}"></button>`;
-      return `<div class="d"><div class="ico">${icon(d.protected ? 'lock' : 'plug')}</div><div><b>${esc(d.name)}</b><small>${sub}</small></div>${sw}</div>`;
+      const sub = unavailable ? 'unavailable' : `${d.watts === null ? dash : `${fx(d.watts, 1)} W`}${d.warn ? ` · ${(WARN_NOTE[d.warn] || 'important').toLowerCase()}` : ''}`;
+      const sw = unavailable
+        ? '<button class="sw lock" disabled title="Unavailable"></button>'
+        : `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle data-name="${esc(d.name)}" data-watts="${d.watts ?? 0}"${d.warn ? ` data-warn="${esc(d.warn)}"` : ''} aria-label="${esc(d.name)}"></button>`;
+      return `<div class="d"><div class="ico">${icon('plug')}</div><div><b>${esc(d.name)}</b><small>${sub}</small></div>${sw}</div>`;
     }).join('')}</div>`);
 }
 

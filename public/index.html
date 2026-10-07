@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Control</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4 0 7-3 7-7 0-3-2-5-3-7-1 2-2 3-3 3 0-3-1-6-4-9 0 4-4 6-4 12 0 4 3 8 7 8z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4"/><path d="M4 20h16"/><path d="M8 15l4-5 3 3 5-7"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v5M15 3v5"/><path d="M6 8h12v4a6 6 0 01-12 0z"/><path d="M12 18v3"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 012-2h9a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M16 10l5-3v10l-5-3"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 17V11a6 6 0 0112 0v6l2 2H4z"/><path d="M10 21h4"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s7 7 7 12a7 7 0 01-14 0c0-5 7-12 7-12z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
+</defs></svg>
+
+<div class="app">
+<nav>
+  <a class="logo" href="#overview" aria-label="Home Control"><svg><use href="#i-home"/></svg></a>
+  <a class="on" href="#overview" data-view="overview" title="Overview" aria-label="Overview"><svg><use href="#i-home"/></svg></a>
+  <a href="#energy" data-view="energy" title="Energy" aria-label="Energy"><svg><use href="#i-bolt"/></svg></a>
+  <a href="#heating" data-view="heating" title="Heating" aria-label="Heating"><svg><use href="#i-flame"/></svg></a>
+  <a href="#security" data-view="security" title="Security" aria-label="Security"><svg><use href="#i-shield"/></svg></a>
+  <a href="#devices" data-view="devices" title="Devices" aria-label="Devices"><svg><use href="#i-plug"/></svg></a>
+  <a href="#reports" data-view="reports" title="Reports" aria-label="Reports"><svg><use href="#i-chart"/></svg></a>
+  <div class="nav-spacer"></div>
+  <button class="link" id="logout">Sign out</button>
+</nav>
+<main>
+  <div class="top">
+    <div><h1 id="greeting">Home</h1><div class="sub" id="subtitle"></div></div>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="grid">
+    <section class="card c8" id="energy"></section>
+    <section class="card c4" id="today"></section>
+    <section class="card c5" id="heating"></section>
+    <section class="card c7" id="security"></section>
+    <section class="card c7" id="power"></section>
+    <section class="card c5" id="controls"></section>
+    <section class="card c6" id="activity"></section>
+    <section class="card c6" id="consumers"></section>
+  </div>
+</main>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/app.js"></script>
+</body>
+</html>

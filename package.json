@@ -1,0 +1,19 @@
+{
+  "name": "home-control",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal home dashboard and control panel on top of Home Assistant",
+  "main": "server/index.js",
+  "engines": { "node": ">=22.15" },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --use-system-ca --watch --env-file-if-exists=.env server/index.js",
+    "demo": "node --use-system-ca --env-file-if-exists=.env server/index.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "pg": "^8.13.0",
+    "ws": "^8.18.0"
+  }
+}

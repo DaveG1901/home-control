@@ -23,6 +23,34 @@
   <symbol id="i-drop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s7 7 7 12a7 7 0 01-14 0c0-5 7-12 7-12z"/></symbol>
   <symbol id="i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></symbol>
   <symbol id="i-bulb" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 00-3.9 10.5c.8.7 1.2 1.5 1.2 2.5h5.4c0-1 .4-1.8 1.2-2.5A6 6 0 0012 3z"/></symbol>
+  <linearGradient id="binShade" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="#fff" stop-opacity=".30"/><stop offset=".30" stop-color="#fff" stop-opacity="0"/>
+    <stop offset=".70" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".40"/>
+  </linearGradient>
+  <linearGradient id="binLid" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset="1" stop-color="#000" stop-opacity=".24"/>
+  </linearGradient>
+  <symbol id="i-bin" viewBox="0 0 64 84">
+    <ellipse cx="32" cy="80.5" rx="23" ry="3" fill="#000" opacity=".4"/>
+    <path d="M11 18H53L49.6 73.5Q49.4 77 46 77H18Q14.6 77 14.4 73.5Z" fill="currentColor"/>
+    <path d="M11 18H53L49.6 73.5Q49.4 77 46 77H18Q14.6 77 14.4 73.5Z" fill="url(#binShade)"/>
+    <rect x="21" y="31" width="22" height="5" rx="2.5" fill="#000" opacity=".26"/>
+    <rect x="5" y="7" width="54" height="13" rx="4.5" fill="currentColor"/>
+    <rect x="5" y="7" width="54" height="13" rx="4.5" fill="url(#binLid)"/>
+    <rect x="22" y="2.5" width="20" height="6" rx="3" fill="currentColor"/>
+    <rect x="22" y="2.5" width="20" height="6" rx="3" fill="#000" opacity=".2"/>
+    <circle cx="19" cy="77.5" r="4" fill="#141b29"/><circle cx="45" cy="77.5" r="4" fill="#141b29"/>
+  </symbol>
+  <symbol id="i-caddy" viewBox="0 0 64 84">
+    <ellipse cx="32" cy="80.5" rx="17" ry="2.6" fill="#000" opacity=".4"/>
+    <path d="M23 36Q32 15 41 36" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/>
+    <path d="M23 36Q32 15 41 36" fill="none" stroke="#000" stroke-width="2.8" stroke-linecap="round" opacity=".25"/>
+    <path d="M16 40H48L45.6 75Q45.4 78 42.6 78H21.4Q18.6 78 18.4 75Z" fill="currentColor"/>
+    <path d="M16 40H48L45.6 75Q45.4 78 42.6 78H21.4Q18.6 78 18.4 75Z" fill="url(#binShade)"/>
+    <rect x="13" y="33" width="38" height="9" rx="3.5" fill="currentColor"/>
+    <rect x="13" y="33" width="38" height="9" rx="3.5" fill="url(#binLid)"/>
+    <rect x="25" y="52" width="14" height="4" rx="2" fill="#000" opacity=".26"/>
+  </symbol>
 </defs></svg>
 
 <div class="app">
@@ -46,7 +74,8 @@
   <div class="grid">
     <section class="card c8" id="energy"></section>
     <section class="card c4" id="today"></section>
-    <section class="card c12" id="surplus"></section>
+    <section class="card c8" id="surplus"></section>
+    <section class="card c4" id="bins"></section>
     <section class="card c5" id="heating"></section>
     <section class="card c7" id="security"></section>
     <section class="card c7" id="power"></section>

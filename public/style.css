@@ -290,3 +290,21 @@ select.filter{appearance:none;-webkit-appearance:none;cursor:pointer;padding-rig
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238ea3cf' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
 select.filter option{background:#0e1d42;color:#e8f0ff}
+
+/* ---------- bindicator ---------- */
+.bin-date{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.bin-date b{font-size:30px;font-weight:600;letter-spacing:-.03em;line-height:1.1}
+.bin-date span{font-size:18px;color:var(--ice);font-weight:500}
+.bin-banner{margin:12px 0 0;padding:9px 13px;border-radius:12px;background:rgba(242,184,75,.1);border:1px solid rgba(242,184,75,.4);color:var(--amber);font-size:13px;font-weight:600}
+.bin-row{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0 8px}
+.bin{display:flex;flex-direction:column;align-items:center;gap:4px;width:88px;text-align:center;font-size:11.5px;line-height:1.25;color:var(--mute)}
+.binpic{width:76px;height:100px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.35))}
+.bin-extras{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.bin-extras span{font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(59,130,246,.12);color:var(--ice)}
+.bin-after{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px}
+.bin-after small{color:var(--dim);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.bin-then{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--text)}
+.bin-then .dots{display:flex;gap:5px}
+.bin-then i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+/* in the Energy and Devices views the solar card has no neighbour: let it use the full row */
+.grid[data-view=energy] #surplus,.grid[data-view=devices] #surplus{grid-column:span 12}

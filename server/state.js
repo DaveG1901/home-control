@@ -28,7 +28,10 @@ class Store extends EventEmitter {
     this.now = () => Date.now(); // overridable in tests
     this.spareAvg = null; // smoothed spare solar (kW), so the card does not flicker with every cloud
     this.spareT = 0;
+    this.binsSource = null; // set by the server: the bin collection service
   }
+
+  setBins(service) { this.binsSource = service; }
 
   applyStates(list) {
     this.entities.clear();
@@ -199,6 +202,7 @@ class Store extends EventEmitter {
       environment: { outsideTemp: round(n(E.environment.outsideTemp), 1), weather: w ? WEATHER[w] || w : null },
       energy, today, heating, security, devices, consumers, catalogue,
       surplus: this.surplusModel(plugState, byId),
+      bins: this.binsSource ? this.binsSource.view() : { available: false, next: null, then: [] },
       activity: this.activity.slice(0, 12),
     };
   }

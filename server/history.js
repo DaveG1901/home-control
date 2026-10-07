@@ -4,11 +4,50 @@
 // Always kept in memory; also persisted to Postgres when DATABASE_URL is set so it survives restarts.
 
 const MAX_POINTS = 3 * 24 * 120; // ~3 days at 30s
+// Samples are written to Postgres in batches, not one at a time. A write every 30 s would keep a serverless database
+// (e.g. Neon's free tier, which sleeps after 5 idle minutes) awake all day and use up its free compute hours.
+const FLUSH_EVERY_MS = 10 * 60_000;
+const MAX_PENDING = 5000; // if the database is unreachable for a long time, keep at most this many unsent samples
 
 class History {
   constructor(pool) {
     this.pool = pool || null;
     this.points = [];
+    this.pending = []; // samples not yet written to the database
+    this.timer = null;
+  }
+
+  /** Start the periodic database write. Call stop() on shutdown to write whatever is left. */
+  start() {
+    if (!this.pool || this.timer) return;
+    this.timer = setInterval(() => this.flush(), FLUSH_EVERY_MS);
+    this.timer.unref();
+  }
+
+  async stop() {
+    clearInterval(this.timer);
+    this.timer = null;
+    await this.flush();
+  }
+
+  /** Write all pending samples in a single INSERT. On failure they are kept and retried at the next flush. */
+  async flush() {
+    if (!this.pool || !this.pending.length) return;
+    const batch = this.pending;
+    this.pending = [];
+    const values = [];
+    const params = [];
+    batch.forEach((p, i) => {
+      const o = i * 5;
+      values.push(`(${o + 1},${o + 2},${o + 3},${o + 4},${o + 5})`);
+      params.push(new Date(p.t), p.pv, p.load, p.batt, p.soc);
+    });
+    try {
+      await this.pool.query(`INSERT INTO power_samples (ts, pv, load, batt, soc) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`, params);
+    } catch (err) {
+      console.error(`[history] could not save ${batch.length} samples, will retry:`, err.message);
+      this.pending = batch.concat(this.pending).slice(-MAX_PENDING);
+    }
   }
 
   async init() {
@@ -31,11 +70,7 @@ class History {
     if (!sample) return;
     this.points.push(sample);
     if (this.points.length > MAX_POINTS) this.points.splice(0, this.points.length - MAX_POINTS);
-    if (this.pool) {
-      this.pool.query('INSERT INTO power_samples (ts, pv, load, batt, soc) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING',
-        [new Date(sample.t), sample.pv, sample.load, sample.batt, sample.soc])
-        .catch((err) => console.error('[history] insert failed:', err.message));
-    }
+    if (this.pool) this.pending.push(sample);
   }
 
   range(fromMs) {

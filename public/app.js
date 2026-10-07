@@ -248,6 +248,38 @@ function renderSurplus(m) {
 let openBoost = null; // id of the zone whose boost menu is open
 const durText = (m) => (m % 60 === 0 ? `${m / 60}h` : `${m}m`);
 
+// ---------- bindicator ----------
+function renderBins(m) {
+  const b = m.bins;
+  const head = (tag, warn) => `<div class="hd"><h2>Bindicator</h2>${tag ? `<span class="tag${warn ? ' warn' : ''}">${esc(tag)}</span>` : ''}</div>`;
+
+  if (!b || !b.available) {
+    setHTML($('#bins'), `${head('Not available', true)}<div class="empty">The bin collection dates could not be read from Home Assistant yet.</div>`);
+    return;
+  }
+  const n = b.next;
+  if (!n) {
+    setHTML($('#bins'), `${head('', false)}<div class="empty">No bin collections found in the next few weeks.</div>`);
+    return;
+  }
+
+  const bin = (k) => `<div class="bin"><svg class="binpic" style="color:${esc(k.color)}" role="img" aria-label="${esc(k.label)}"><use href="#${k.caddy ? 'i-caddy' : 'i-bin'}"/></svg><span>${esc(k.label)}</span></div>`;
+  const pics = n.bins.length ? n.bins.map(bin).join('') : `<div class="empty">${esc(n.summary)}</div>`;
+  const extras = n.extras.length ? `<div class="bin-extras">${n.extras.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : '';
+  const banner = b.putOutTonight ? '<div class="bin-banner">Put the bins out tonight</div>'
+    : n.daysAway === 0 ? '<div class="bin-banner">Collection day: bins out by the kerb</div>' : '';
+  const then = b.then.slice(0, 2).map((d) => `<div class="bin-then"><span>${esc(d.short)}</span><span class="dots">${d.bins.map((k) => `<i style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('')}</span></div>`).join('');
+
+  setHTML($('#bins'), `
+    ${head(n.when, n.daysAway <= 1)}
+    <div class="bin-date"><b>${esc(n.weekday)}</b><span>${esc(n.dayMonth)}</span></div>
+    ${banner}
+    <div class="bin-row">${pics}</div>
+    ${extras}
+    ${then ? `<div class="bin-after"><small>After that</small>${then}</div>` : ''}
+    ${b.stale ? '<div class="sub" style="margin-top:10px;font-size:11.5px">Showing the last dates read: the council calendar could not be refreshed.</div>' : ''}`);
+}
+
 function renderHeating(m) {
   const h = m.heating;
   const main = h.main;
@@ -651,6 +683,7 @@ function renderAll() {
   updateEnergy(m.energy);
   renderToday(m);
   renderSurplus(m);
+  renderBins(m);
   renderHeating(m);
   renderSecurity(m);
   renderControls(m);
@@ -682,7 +715,7 @@ function connect() {
 
 // ---------- views (side navigation) ----------
 const VIEWS = {
-  overview: ['energy', 'today', 'surplus', 'heating', 'security', 'power', 'controls', 'activity', 'consumers'],
+  overview: ['energy', 'today', 'surplus', 'bins', 'heating', 'security', 'power', 'controls', 'activity', 'consumers'],
   energy: ['energy', 'today', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],

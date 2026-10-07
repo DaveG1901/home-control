@@ -12,6 +12,8 @@ const { History } = require('./history');
 const { createAuth } = require('./auth');
 const { buildCommands, cameras } = require('./entities');
 const { createFakeHa } = require('./fakeHa');
+const { BinService, demoEvents } = require('./bins');
+const { bins: binsConfig } = require('./entities');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 const OPEN_PATHS = new Set(['/login', '/login.html', '/login.js', '/healthz', '/favicon.svg']);
@@ -31,7 +33,7 @@ async function start(config = defaultConfig) {
   let pool = null;
   if (config.databaseUrl) {
     const { Pool } = require('pg');
-    pool = new Pool({ connectionString: config.databaseUrl, max: 3 });
+    pool = new Pool({ connectionString: config.databaseUrl, max: 3, connectionTimeoutMillis: 20_000 }); // allow for a sleeping database waking up
     pool.on('error', (e) => console.error('[db] pool error:', e.message));
   }
   const history = new History(pool);
@@ -40,6 +42,7 @@ async function start(config = defaultConfig) {
     history.pool = null;
   }
   if (config.mode === 'demo') history.backfillDemo();
+  history.start();
 
   // ---- Home Assistant (real, or the built-in fake in demo mode) ----
   const store = new Store(config.mode);
@@ -58,6 +61,15 @@ async function start(config = defaultConfig) {
   ha.on('states', (list) => { store.applyStates(list); history.add(store.sample()); });
   ha.on('state_changed', (id, s) => store.applyChange(id, s));
   ha.start();
+
+  // Bin collections: read from the council calendar in Home Assistant (made-up Mondays in demo mode)
+  const bins = new BinService({
+    calendar: binsConfig.calendar,
+    fetchEvents: config.mode === 'demo' ? async () => demoEvents() : (id, from, to) => ha.calendarEvents(id, from, to),
+  });
+  store.setBins(bins);
+  ha.on('connected', () => { bins.refresh().then(() => store.emit('change')); });
+  bins.start(() => store.emit('change'));
 
   const sampler = setInterval(() => { if (store.haConnected && store.ready) history.add(store.sample()); }, SAMPLE_EVERY_MS);
 
@@ -197,13 +209,15 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   async function close() {
     clearInterval(sampler); clearInterval(heartbeat);
     ha.stop();
+    bins.stop();
+    await history.stop(); // write any unsaved chart samples
     for (const c of wss.clients) c.terminate();
     await new Promise((r) => server.close(r));
     if (fake) await fake.close();
     if (pool) await pool.end().catch(() => {});
   }
 
-  return { server, port, store, ha, fake, history, boostMemory, close };
+  return { server, port, store, ha, fake, history, boostMemory, bins, close };
 }
 
 if (require.main === module) {

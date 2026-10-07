@@ -22,6 +22,7 @@ class HAClient extends EventEmitter {
   constructor({ url, token }) {
     super();
     this.url = toWsUrl(url);
+    this.baseUrl = String(url).replace(/\/+$/, ''); // for the few things only the REST API offers
     this.token = token;
     this.ws = null;
     this.nextId = 1;
@@ -156,6 +157,14 @@ class HAClient extends EventEmitter {
       this.pending.set(id, { resolve, reject, timer });
       this.ws.send(JSON.stringify({ id, ...obj }));
     });
+  }
+
+  /** Events from a Home Assistant calendar between two ISO times (REST API: calendars have no WebSocket equivalent). */
+  async calendarEvents(entityId, startIso, endIso) {
+    const url = `${this.baseUrl}/api/calendars/${encodeURIComponent(entityId)}?start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${this.token}` }, signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) throw new Error(`Calendar request failed (HTTP ${res.status})`);
+    return res.json();
   }
 
   /** Ask HA to start a live HLS stream for a camera. Resolves to a path such as /api/hls/<token>/master_playlist.m3u8 */

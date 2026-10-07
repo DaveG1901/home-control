@@ -154,6 +154,19 @@ const groupBy = (list) => {
   return [...map].map(([name, items]) => ({ name, items }));
 };
 
+// Council bin collections ("Bindicator"). The calendar comes from the council via a Home Assistant calendar integration.
+// Bin colours are the council's; change them here if the council changes its bins.
+const bins = {
+  calendar: 'calendar.vale_1_south_2_monday_waste_collections',
+  always: ['food'], // collected every week, whatever the council's event title says
+  kinds: {
+    grey: { label: 'Grey rubbish', color: '#8d99ab' },
+    green: { label: 'Green recycling', color: '#2fa05b' },
+    brown: { label: 'Brown garden waste', color: '#9a6a43' },
+    food: { label: 'Food waste', color: '#6cb58c', caddy: true },
+  },
+};
+
 // Appliances offered on the "Solar surplus" card, with their typical draw in kW.
 // Must be plugs above with control: true. Switching a plug only powers the socket: the appliance itself still needs starting.
 const surplusDevices = [
@@ -268,4 +281,4 @@ function watchedEntities() {
   return set;
 }
 
-module.exports = { energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, quickControls, surplusDevices, buildCommands, watchedEntities };
+module.exports = { energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, bins, quickControls, surplusDevices, buildCommands, watchedEntities };

@@ -149,3 +149,6 @@ nav a{text-decoration:none}
   .grid[data-view=reports] #power{grid-column:span 8}
   .grid[data-view=reports] #today{grid-column:span 4}
 }
+
+/* keep pill labels on one line even when positioned near the card edge */
+.node,.node small{white-space:nowrap}

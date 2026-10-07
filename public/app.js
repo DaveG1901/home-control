@@ -85,10 +85,10 @@ document.addEventListener('click', (e) => {
   command(id, value, msg);
 });
 
-$('#logout').addEventListener('click', async () => {
+document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   location.href = '/login';
-});
+}));
 
 // ---------- header ----------
 function renderHeader(m) {
@@ -354,13 +354,15 @@ function setView(name) {
   document.querySelectorAll('.grid > .card').forEach((c) => { c.hidden = !!show && !show.includes(c.id); });
   document.querySelectorAll('nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === name));
   document.title = name === 'overview' ? 'Home Control' : `${VIEW_TITLES[name]} · Home Control`;
+  window.scrollTo(0, 0);
   requestAnimationFrame(drawChart); // the chart needs a visible container to measure its width
 }
-window.addEventListener('hashchange', () => setView(location.hash.slice(1)));
+const viewFromHash = () => location.hash.replace(/^#\/?/, '');
+window.addEventListener('hashchange', () => setView(viewFromHash()));
 
 buildEnergy();
 buildPower();
-setView(location.hash.slice(1));
+setView(viewFromHash());
 connect();
 loadHistory();
 setInterval(loadHistory, 60_000);

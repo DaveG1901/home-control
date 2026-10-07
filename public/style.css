@@ -152,3 +152,61 @@ nav a{text-decoration:none}
 
 /* keep pill labels on one line even when positioned near the card edge */
 .node,.node small{white-space:nowrap}
+
+/* ---------- phone layout ---------- */
+nav a .lbl{display:none}
+.signout-m{display:none}
+@media(max-width:700px){
+  body{padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .app{grid-template-columns:1fr}
+  main{padding:16px 14px 20px}
+  .top{margin-bottom:14px;gap:10px}
+  h1{font-size:22px}
+  .chips{gap:8px}
+  .chip{padding:6px 11px;font-size:12px}
+  .signout-m{display:block;background:none;border:1px solid var(--line);color:var(--mute);font:inherit;font-size:12px;border-radius:999px;padding:6px 12px;cursor:pointer}
+  .grid{gap:12px}
+  .card{padding:16px;border-radius:18px}
+  .hd{flex-wrap:wrap}
+
+  /* sidebar becomes a bottom tab bar */
+  nav{display:flex;flex-direction:row;justify-content:space-around;align-items:stretch;position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom));gap:2px;border-right:0;border-top:1px solid var(--line);
+    background:rgba(5,12,29,.94);backdrop-filter:blur(14px);z-index:20}
+  nav .logo,nav .nav-spacer,nav #logout{display:none}
+  nav a{flex:1;width:auto;height:54px;flex-direction:column;gap:3px;border-radius:12px}
+  nav a{display:flex;align-items:center;justify-content:center}
+  nav a svg{width:21px;height:21px}
+  nav a .lbl{display:block;font-size:10px;line-height:1;letter-spacing:.02em}
+
+  /* energy card: the house on top, readings in a tidy grid underneath (no overlapping pills) */
+  .stage{aspect-ratio:auto;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .stage img.house{position:relative;left:auto;top:auto;width:100%;grid-column:1/-1;filter:drop-shadow(0 14px 22px rgba(37,99,235,.35))}
+  .stage .base,.stage .flows{display:none}
+  .stage .node{position:static;transform:none;min-width:0!important;text-align:left!important;width:100%}
+  .stage .node small{justify-content:flex-start!important}
+
+  .big{flex-wrap:wrap;gap:14px}
+  .big .t{font-size:42px}
+  .stepper button{width:46px;height:46px}
+  .seg{display:flex;width:100%}
+  .seg button{flex:1;padding:11px 8px}
+  .zones{grid-template-columns:repeat(2,1fr)}
+  .cams{grid-template-columns:repeat(2,1fr)}
+  .hw .btn,.btn{padding:11px 16px}
+  .sw{width:48px;height:28px}
+  .sw::after{width:22px;height:22px}
+  .sw.on::after{left:23px}
+  .d{padding:12px}
+  #chart{height:210px}
+  .legend{gap:10px;font-size:12px}
+  .toast{left:14px;right:14px;bottom:calc(84px + env(safe-area-inset-bottom));text-align:center}
+}
+
+/* let grid columns shrink below their content's natural width (prevents sideways overflow on small screens) */
+.app{grid-template-columns:76px minmax(0,1fr)}
+.grid{grid-template-columns:repeat(12,minmax(0,1fr))}
+main,.card,.top>div{min-width:0}
+@media(max-width:700px){.app{grid-template-columns:minmax(0,1fr)}}
+
+.node small i{flex:none}

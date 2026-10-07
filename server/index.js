@@ -79,7 +79,8 @@ async function start(config = defaultConfig) {
   });
   app.use(express.json({ limit: '10kb' }));
 
-  app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode }));
+  const commit = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || null; // set by Render; shows which version is running
+app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit }));
   app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
   app.post('/api/login', (req, res) => (sameOrigin(req) ? auth.login(req, res) : res.status(403).json({ error: 'Bad origin' })));
   app.post('/api/logout', (req, res) => auth.logout(req, res));

@@ -63,7 +63,12 @@ async function start(config = defaultConfig) {
 
   // ---- web app ----
   const auth = createAuth({ password: config.appPassword, secret: config.sessionSecret, secure: config.production });
-  const commands = buildCommands();
+  const boostMemory = new Map(); // zone id -> the mode it was in before an app-started boost
+  const commands = buildCommands({
+    mode: (id) => { const e = store.raw(id); return e ? e.state : null; },
+    preset: (id) => store.attr(id, 'preset_mode'),
+    memory: boostMemory,
+  });
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -198,7 +203,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
     if (pool) await pool.end().catch(() => {});
   }
 
-  return { server, port, store, ha, fake, history, close };
+  return { server, port, store, ha, fake, history, boostMemory, close };
 }
 
 if (require.main === module) {

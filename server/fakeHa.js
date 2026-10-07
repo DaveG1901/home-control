@@ -95,6 +95,7 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
   const wss = new WebSocketServer({ host, port, path: '/api/websocket' });
   await new Promise((resolve) => wss.once('listening', resolve));
   const timers = new Set();
+  const boostPrev = new Map(); // climate entity -> mode it had before a boost (Hive restores this when a boost runs out)
 
   const now = () => new Date().toISOString();
   const withMeta = (st) => ({ ...st, last_changed: now(), last_updated: now(), context: { id: 'fake' } });
@@ -116,7 +117,9 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
     setState(sensorId, on ? (NOMINAL_WATTS[name] ?? Math.max(1, +states[sensorId].state || 10)) : 0);
   }
 
+  const calls = []; // every service call received, so tests can see exactly what was sent
   function callService(domain, service, data) {
+    calls.push({ domain, service, data });
     const id = data.entity_id;
     const known = (e) => { if (!states[e]) throw Object.assign(new Error(`Entity ${e} not found`), { code: 'not_found' }); };
     if ((domain === 'switch' || domain === 'light') && (service === 'turn_on' || service === 'turn_off')) {
@@ -126,12 +129,18 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
       return;
     }
     if (domain === 'climate' && service === 'set_temperature') { known(id); setState(id, states[id].state, { ...states[id].attributes, temperature: data.temperature }); return; }
-    if (domain === 'climate' && service === 'set_hvac_mode') { known(id); setState(id, data.hvac_mode); return; }
-    if (domain === 'hive' && (service === 'boost_heating_on' || service === 'boost_heating_off')) {
+    if (domain === 'climate' && service === 'set_hvac_mode') { known(id); setState(id, data.hvac_mode, { ...states[id].attributes, preset_mode: 'none', hvac_action: 'idle' }); return; }
+    // ...but, like the real Hive integration, these two cannot cancel a boost: they raise KeyError 'mode'
+    if (domain === 'climate' && service === 'set_preset_mode') { known(id); throw Object.assign(new Error("'mode'"), { code: 'unknown_error' }); }
+    if (domain === 'hive' && service === 'boost_heating_off') { known(id); throw Object.assign(new Error("'mode'"), { code: 'unknown_error' }); }
+    if (domain === 'hive' && service === 'boost_heating_on') {
       known(id);
-      const on = service === 'boost_heating_on';
-      setState(id, states[id].state, { ...states[id].attributes, preset_mode: on ? 'boost' : 'none', hvac_action: on ? 'heating' : 'idle', ...(on ? { temperature: data.temperature } : {}) });
-      if (on) { const m = String(data.time_period || '00:30:00').split(':').map(Number); const t = setTimeout(() => setState(id, states[id].state, { ...states[id].attributes, preset_mode: 'none', hvac_action: 'idle' }), ((m[0] * 60) + m[1]) * 60_000); timers.add(t); }
+      const before = states[id].attributes.preset_mode === 'boost' ? (boostPrev.get(id) || states[id].state) : states[id].state;
+      boostPrev.set(id, before);
+      setState(id, 'heat', { ...states[id].attributes, preset_mode: 'boost', hvac_action: 'heating', temperature: data.temperature });
+      const m = String(data.time_period || '00:30:00').split(':').map(Number);
+      const t = setTimeout(() => { if (states[id].attributes.preset_mode === 'boost') setState(id, boostPrev.get(id) || 'off', { ...states[id].attributes, preset_mode: 'none', hvac_action: 'idle' }); }, ((m[0] * 60) + m[1]) * 60_000);
+      timers.add(t);
       return;
     }
     if (domain === 'hive' && service === 'boost_hot_water') {
@@ -221,6 +230,7 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
     url: `http://${host}:${address.port}`,
     port: address.port,
     states,
+    calls,
     setState,
     close: () => new Promise((resolve) => { for (const t of timers) { clearTimeout(t); clearInterval(t); } for (const ws of wss.clients) ws.terminate(); wss.close(() => resolve()); }),
   };

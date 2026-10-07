@@ -169,7 +169,7 @@ const quickControls = ['dishwasher', 'tumble_dryer', 'garage_heater', 'purifier'
  * Command allowlist. A command is { entity, domain, services:(value)=>[{domain,service,data}], validate(value) }.
  * The client sends { id, value }; anything not defined here is rejected.
  */
-function buildCommands() {
+function buildCommands(ctx = { mode: () => null, preset: () => null, memory: new Map() }) {
   const cmds = new Map();
   const onOff = (v) => v === 'on' || v === 'off';
 
@@ -225,14 +225,29 @@ function buildCommands() {
     describe: (v) => (v === 0 ? 'Hot water boost cancelled' : `Hot water boost for ${minutesText(v)}`),
   });
 
-  // Heating boost for the main thermostat and for every zone: hive.boost_heating_on / boost_heating_off.
+  // Heating boost for the main thermostat and for every zone.
+  // Starting uses hive.boost_heating_on. CANCELLING cannot use hive.boost_heating_off or climate.set_preset_mode: in this Home
+  // Assistant both raise a KeyError ('mode') inside the Hive integration and leave the boost running. What does work is putting
+  // the zone back into the mode it had before the boost, so we remember that mode when a boost starts.
+  const MODES = ['off', 'auto', 'heat'];
   for (const z of [h.main, ...h.zones]) {
     cmds.set(`boost:${z.id}`, {
       label: `${z.name} boost`,
       validate: boostMinutes,
-      call: (v) => (v === 0
-        ? { domain: 'hive', service: 'boost_heating_off', data: { entity_id: z.climate } }
-        : { domain: 'hive', service: 'boost_heating_on', data: { entity_id: z.climate, time_period: hms(v), temperature: h.boost.temperature } }),
+      call: (v) => {
+        if (v > 0) {
+          if (ctx.preset(z.climate) !== 'boost') { const m = ctx.mode(z.climate); if (MODES.includes(m)) ctx.memory.set(z.id, m); }
+          return { domain: 'hive', service: 'boost_heating_on', data: { entity_id: z.climate, time_period: hms(v), temperature: h.boost.temperature } };
+        }
+        const prev = ctx.memory.get(z.id);
+        if (MODES.includes(prev)) {
+          ctx.memory.delete(z.id);
+          return { domain: 'climate', service: 'set_hvac_mode', data: { entity_id: z.climate, hvac_mode: prev } };
+        }
+        // Mode unknown (boost started in the Hive app, or this server restarted): replace it with a 1-minute boost. When a
+        // boost runs out Hive restores the previous mode itself (tested), so this ends within a couple of minutes.
+        return { domain: 'hive', service: 'boost_heating_on', data: { entity_id: z.climate, time_period: hms(1), temperature: h.boost.temperature } };
+      },
       describe: (v) => (v === 0 ? `${z.name} boost cancelled` : `${z.name} boosted to ${h.boost.temperature}° for ${minutesText(v)}`),
     });
   }

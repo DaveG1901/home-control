@@ -95,6 +95,7 @@ test('heating boost works on the main thermostat and every zone, and can be canc
   await until(() => app.store.attr('climate.lobby', 'preset_mode') === 'none');
   vm = await state();
   assert.equal(vm.heating.zones.find((z) => z.id === 'lobby').boost, false);
+  assert.equal(vm.heating.zones.find((z) => z.id === 'lobby').mode, 'off', 'back in the mode it had before the boost');
   assert.equal(vm.heating.zones.find((z) => z.id === 'office').boost, true, 'other zones keep boosting');
   assert.ok(vm.activity.some((a) => /Lobby boost cancelled/.test(a.text)));
   assert.ok(vm.activity.some((a) => /boosted to 21° for 1 h/.test(a.text)));
@@ -110,4 +111,60 @@ test('boost and hot water only accept the offered durations', async (t) => {
   assert.equal((await cmd('hotwater.boost', 90)).status, 400);
   assert.equal((await cmd('hotwater.boost', 0)).status, 200);
   await until(() => !app.store.isOn('binary_sensor.hotwater_boost'));
+});
+
+// Home Assistant's Hive integration cannot cancel a boost with hive.boost_heating_off or climate.set_preset_mode
+// (both raise KeyError 'mode'). The fake reproduces that, so these tests prove the app works around it.
+test('cancelling a boost never uses the actions that fail, and restores the zone mode it had before', async (t) => {
+  const { app, cmd } = await demoApp(t);
+  app.fake.setState('climate.office', 'auto', { ...app.fake.states['climate.office'].attributes }); // office follows its schedule
+  await until(() => app.store.raw('climate.office').state === 'auto');
+  app.fake.calls.length = 0;
+
+  assert.equal((await cmd('boost:office', 60)).status, 200);
+  await until(() => app.store.attr('climate.office', 'preset_mode') === 'boost');
+  assert.equal(app.boostMemory.get('office'), 'auto', 'remembers the mode before the boost');
+
+  assert.equal((await cmd('boost:office', 0)).status, 200);
+  await until(() => app.store.attr('climate.office', 'preset_mode') === 'none');
+  assert.equal(app.store.raw('climate.office').state, 'auto', 'back on its schedule, not left on heat');
+  assert.equal(app.boostMemory.has('office'), false);
+  const used = app.fake.calls.map((c) => c.domain + '.' + c.service);
+  assert.ok(used.includes('climate.set_hvac_mode'));
+  assert.ok(!used.includes('hive.boost_heating_off') && !used.includes('climate.set_preset_mode'), 'must not use the failing cancel actions');
+});
+
+test('cancelling when the earlier mode is not known (restart, or boost started in the Hive app) falls back to a 1 minute boost', async (t) => {
+  const { app, cmd } = await demoApp(t);
+  assert.equal((await cmd('boost:utility', 120)).status, 200);
+  await until(() => app.store.attr('climate.utility', 'preset_mode') === 'boost');
+  app.boostMemory.clear(); // as if the server had restarted
+  app.fake.calls.length = 0;
+
+  assert.equal((await cmd('boost:utility', 0)).status, 200);
+  const sent = app.fake.calls.find((c) => c.service === 'boost_heating_on');
+  assert.ok(sent, 'a replacement boost is sent');
+  assert.equal(sent.data.time_period, '00:01:00');
+  assert.equal(sent.data.temperature, 21);
+  assert.ok(!app.fake.calls.some((c) => c.service === 'boost_heating_off'));
+});
+
+test('a zone that reports an "unknown" mode is shown as unknown, not unavailable, so its buttons stay usable', async (t) => {
+  const { app, state } = await demoApp(t);
+  app.fake.setState('climate.office', 'unknown', { ...app.fake.states['climate.office'].attributes });
+  await until(() => app.store.raw('climate.office').state === 'unknown');
+  const zone = (await state()).heating.zones.find((z) => z.id === 'office');
+  assert.equal(zone.mode, 'unknown');
+  app.fake.setState('climate.office', 'unavailable', { ...app.fake.states['climate.office'].attributes });
+  await until(() => app.store.raw('climate.office').state === 'unavailable');
+  assert.equal((await state()).heating.zones.find((z) => z.id === 'office').mode, 'unavailable');
+});
+
+test('starting a boost twice does not overwrite the remembered mode with the boost state', async (t) => {
+  const { app, cmd } = await demoApp(t);
+  assert.equal((await cmd('boost:lobby', 30)).status, 200);
+  await until(() => app.store.attr('climate.lobby', 'preset_mode') === 'boost');
+  assert.equal(app.boostMemory.get('lobby'), 'off');
+  assert.equal((await cmd('boost:lobby', 120)).status, 200); // extend it
+  assert.equal(app.boostMemory.get('lobby'), 'off', 'still the pre-boost mode, not "heat"');
 });

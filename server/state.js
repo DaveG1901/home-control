@@ -146,7 +146,7 @@ class Store extends EventEmitter {
       name: z.name,
       current: round(this.attr(z.climate, 'current_temperature'), 1),
       target: round(this.attr(z.climate, 'temperature'), 1),
-      mode: this.str(z.climate) || 'unavailable',
+      mode: (this.raw(z.climate) || { state: 'unavailable' }).state,
       modes: this.attr(z.climate, 'hvac_modes') || [],
       boost: this.attr(z.climate, 'preset_mode') === 'boost',
       hvacAction: this.attr(z.climate, 'hvac_action'),

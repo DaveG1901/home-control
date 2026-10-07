@@ -16,13 +16,18 @@ let history = [];
 
 // Optimistic overlay: show the user's action immediately, until Home Assistant confirms (or 5s passes).
 const optimistic = new Map();
+// Boosts can take Hive up to ~10 s to confirm, so those are held longer, and dropped as soon as Home Assistant agrees.
+const BOOST_KEY = /^(boost:|hotwater.boost)/;
 const opt = (key, real) => {
   const o = optimistic.get(key);
-  if (o && o.until > Date.now()) return o.value;
+  if (o && o.until > Date.now()) {
+    if (BOOST_KEY.test(key) && (o.value > 0) === (real > 0)) { optimistic.delete(key); return real; }
+    return o.value;
+  }
   optimistic.delete(key);
   return real;
 };
-const holdOptimistic = (key, value) => optimistic.set(key, { value, until: Date.now() + 5000 });
+const holdOptimistic = (key, value) => optimistic.set(key, { value, until: Date.now() + (BOOST_KEY.test(key) ? 25_000 : 5_000) });
 
 // ---------- toast ----------
 let toastTimer;
@@ -297,17 +302,23 @@ function renderHeating(m) {
 }
 
 // ---------- all plugs and lights (each switched on its own; there is deliberately no "all" button) ----------
-let plugFilter = '';
+// Which room the Plugs list is showing ('' = all). Remembered on this device.
+let plugRoom = '';
+try { plugRoom = localStorage.getItem('plugRoom') || ''; } catch { /* storage unavailable: fine */ }
 
 function buildDevices() {
   $('#plugs').innerHTML = `
     <div class="hd"><h2>Plugs</h2><span class="tag" id="plug-count"></span></div>
-    <input class="filter" id="plug-filter" type="search" placeholder="Filter plugs, e.g. kitchen or TV" aria-label="Filter plugs" autocomplete="off">
+    <select class="filter" id="plug-room" aria-label="Show plugs in room"><option value="">All rooms</option></select>
     <div class="dgroups" id="plug-rows"></div>`;
   $('#lights').innerHTML = `
     <div class="hd"><h2>Lights</h2><span class="tag" id="light-count"></span></div>
     <div class="dgroups" id="light-rows"></div>`;
-  $('#plug-filter').addEventListener('input', (e) => { plugFilter = e.target.value.trim().toLowerCase(); if (model) renderPlugs(model); });
+  $('#plug-room').addEventListener('change', (e) => {
+    plugRoom = e.target.value;
+    try { localStorage.setItem('plugRoom', plugRoom); } catch { /* ignore */ }
+    if (model) renderPlugs(model);
+  });
 }
 
 // Plugs marked important ask for confirmation before they are switched off (see the click handler).
@@ -325,9 +336,9 @@ function deviceRow(item, kind) {
   return `<div class="drow${unavailable ? ' off' : ''}"><div class="ico">${icon(kind === 'light' ? 'bulb' : 'plug')}</div><div class="dn"><b>${esc(item.name)}</b><small>${esc(sub)}</small></div>${sw}</div>`;
 }
 
-function groupsHtml(groups, kind, filter) {
-  return groups.map((g) => {
-    const items = filter ? g.items.filter((i) => `${i.name} ${g.name}`.toLowerCase().includes(filter)) : g.items;
+function groupsHtml(groups, kind, room) {
+  return groups.filter((g) => !room || g.name === room).map((g) => {
+    const items = g.items;
     if (!items.length) return '';
     const onCount = items.filter((i) => i.state === 'on').length;
     return `<div class="dgroup"><div class="dgh"><span>${esc(g.name)}</span><small>${onCount} of ${items.length} on</small></div>${items.map((i) => deviceRow(i, kind)).join('')}</div>`;
@@ -340,9 +351,16 @@ function countText(groups) {
 }
 
 function renderPlugs(m) {
-  const html = groupsHtml(m.catalogue.plugs, 'plug', plugFilter);
-  setHTML($('#plug-rows'), html || '<div class="empty">No plugs match that filter.</div>');
-  $('#plug-count').textContent = countText(m.catalogue.plugs);
+  const groups = m.catalogue.plugs;
+  // keep the dropdown in step with the rooms Home Control knows about (only rebuilt when they change)
+  const sel = $('#plug-room');
+  const optionsHtml = `<option value="">All rooms (${groups.reduce((n, g) => n + g.items.length, 0)})</option>${groups.map((g) => `<option value="${esc(g.name)}">${esc(g.name)} (${g.items.length})</option>`).join('')}`;
+  if (sel._h !== optionsHtml) { sel.innerHTML = optionsHtml; sel._h = optionsHtml; }
+  if (plugRoom && !groups.some((g) => g.name === plugRoom)) plugRoom = ''; // a remembered room that no longer exists
+  sel.value = plugRoom;
+  const shown = groups.filter((g) => !plugRoom || g.name === plugRoom);
+  setHTML($('#plug-rows'), groupsHtml(groups, 'plug', plugRoom) || '<div class="empty">No plugs in this room.</div>');
+  $('#plug-count').textContent = countText(shown);
 }
 
 function renderLights(m) {

@@ -119,6 +119,14 @@ function renderHeader(m) {
   if (m.environment.outsideTemp !== null) {
     chips.push(`<div class="chip">${fx(m.environment.outsideTemp, 1)}°C${m.environment.weather ? ` · ${esc(m.environment.weather)}` : ''}</div>`);
   }
+  // Next bin day, on every page. Links to the full Bindicator card on the Overview.
+  const bn = m.bins && m.bins.available ? m.bins.next : null;
+  if (bn) {
+    const urgent = m.bins.putOutTonight || bn.daysAway === 0;
+    const text = m.bins.putOutTonight ? 'Bins out tonight' : bn.daysAway === 0 ? 'Bins today' : bn.daysAway === 1 ? 'Bins tomorrow' : `Bins ${bn.short}`;
+    const dots = bn.bins.map((k) => `<i class="cdot" style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('');
+    chips.push(`<a class="chip binchip${urgent ? ' urgent' : ''}" href="#/overview" title="Next bin collection: ${esc(`${bn.weekday} ${bn.dayMonth}`)}">${dots}<span>${esc(text)}</span></a>`);
+  }
   if (m.connection.error) chips.push(`<div class="chip bad"><span class="dot red"></span>${esc(m.connection.error)}</div>`);
   else if (!wsOpen) chips.push('<div class="chip demo"><span class="dot amber"></span>Reconnecting…</div>');
   else if (!m.connection.ha) chips.push('<div class="chip bad"><span class="dot red"></span>Home Assistant offline</div>');

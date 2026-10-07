@@ -1,14 +1,14 @@
 # Render blueprint. Starter plan: always on (the free plan sleeps after 15 minutes without traffic).
 # Secrets are entered in the Render dashboard (never committed).
 # IMPORTANT: Render re-applies the values in this file whenever the file changes, so anything set by hand in the dashboard
-# (e.g. HA_MODE) must ALSO be set here, or it gets reset on the next sync.
+# (e.g. HA_MODE) must ALSO be set here, or it gets reset on the next sync. Variables that are not listed here (DATABASE_URL, the
+# Neon connection string) are left alone: Render preserves variables a Blueprint does not mention.
 #
-# Two services are listed while moving from Oregon to Frankfurt (a service's region cannot be changed once created):
-#   home-control     the original, in Oregon  -> delete it in the dashboard once home-control-eu works, then remove it here
-#   home-control-eu  the replacement, in Frankfurt
+# Frankfurt, because Home Assistant's Nabu Casa gateway is in Europe (a service's region cannot be changed once created).
 services:
   - type: web
-    name: home-control
+    name: home-control-eu
+    region: frankfurt
     runtime: node
     plan: starter
     buildCommand: npm install --omit=dev
@@ -28,28 +28,4 @@ services:
       - key: SESSION_SECRET
         generateValue: true
       - key: APP_PASSWORD
-        sync: false
-
-  - type: web
-    name: home-control-eu
-    region: frankfurt
-    runtime: node
-    plan: starter
-    buildCommand: npm install --omit=dev
-    startCommand: node server/index.js
-    healthCheckPath: /healthz
-    envVars:
-      - key: NODE_VERSION
-        value: "22"
-      - key: NODE_ENV
-        value: production
-      - key: HA_MODE
-        value: live
-      - key: HA_URL
-        value: https://home.dgarwood.co.uk
-      - key: HA_TOKEN
-        sync: false
-      - key: SESSION_SECRET
-        generateValue: true
-      - key: APP_PASSWORD
-        sync: false
+        sync: false            # secret: set in the Render dashboard

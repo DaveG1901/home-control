@@ -420,6 +420,7 @@ const camTiles = new Map(); // camera id -> { el, view, video, msg, label, statu
 
 const STREAM_TEXT = {
   idle: 'Tap to watch live',
+  paused: 'Paused to save data. Tap to resume',
   connecting: 'Connecting… up to 10 seconds the first time',
   live: '',
   error: 'Stream unavailable, retrying…',
@@ -570,20 +571,38 @@ function ensureCamTiles(cameras) {
 function updateCamTile(t) {
   const st = t.stream.state;
   t.el.classList.toggle('playing', st === 'live');
-  t.msg.textContent = STREAM_TEXT[st] || '';
+  t.msg.textContent = STREAM_TEXT[st === 'idle' && pausedForIdle ? 'paused' : st] || '';
   t.label.textContent = t.alert ? 'ALERT' : st === 'live' ? 'LIVE' : '';
   t.label.style.display = t.label.textContent ? '' : 'none';
 }
 
-// Streams run only while someone is actually looking: the Security tab (all four), or a tile tapped on the overview.
+// Streams run only while someone is actually looking: whenever the Security card is on screen (the Home page and the Security
+// tab), the page is in the foreground, and there has been some activity in the last few minutes.
+const IDLE_PAUSE_MS = 10 * 60_000;
+let pausedForIdle = false;
+let lastActivity = Date.now();
+
 function syncStreams() {
   const visible = document.visibilityState === 'visible';
   const securityShown = !$('#security').hidden;
   for (const t of camTiles.values()) {
-    const want = visible && securityShown && (currentView === 'security' || t.manual);
+    const want = visible && securityShown && !pausedForIdle;
     if (want) t.stream.start(); else t.stream.stop();
+    updateCamTile(t);
   }
 }
+
+// A phone left open on a camera page would otherwise stream video all day. Any touch, click or key press resumes it.
+function checkIdle() {
+  if (!pausedForIdle && Date.now() - lastActivity > IDLE_PAUSE_MS) { pausedForIdle = true; syncStreams(); }
+}
+for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel']) {
+  window.addEventListener(ev, () => {
+    lastActivity = Date.now();
+    if (pausedForIdle) { pausedForIdle = false; syncStreams(); }
+  }, { passive: true });
+}
+setInterval(checkIdle, 30_000);
 document.addEventListener('visibilitychange', () => {
   syncStreams();
   if (document.visibilityState === 'visible') fetch('/api/cameras/warm', { method: 'POST' }).catch(() => {}); // start the streams ahead of a visit to Security

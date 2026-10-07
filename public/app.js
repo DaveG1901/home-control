@@ -342,23 +342,26 @@ function renderHeating(m) {
 }
 
 // ---------- all plugs and lights (each switched on its own; there is deliberately no "all" button) ----------
-// Which room the Plugs list is showing ('' = all). Remembered on this device.
-let plugRoom = '';
-try { plugRoom = localStorage.getItem('plugRoom') || ''; } catch { /* storage unavailable: fine */ }
+// Which room each list is showing ('' = all rooms). Remembered on this device, separately for plugs and lights.
+const rooms = { plug: '', light: '' };
+for (const kind of Object.keys(rooms)) {
+  try { rooms[kind] = localStorage.getItem(`${kind}Room`) || ''; } catch { /* storage unavailable: fine */ }
+}
 
 function buildDevices() {
-  $('#plugs').innerHTML = `
-    <div class="hd"><h2>Plugs</h2><span class="tag" id="plug-count"></span></div>
-    <select class="filter" id="plug-room" aria-label="Show plugs in room"><option value="">All rooms</option></select>
-    <div class="dgroups" id="plug-rows"></div>`;
-  $('#lights').innerHTML = `
-    <div class="hd"><h2>Lights</h2><span class="tag" id="light-count"></span></div>
-    <div class="dgroups" id="light-rows"></div>`;
-  $('#plug-room').addEventListener('change', (e) => {
-    plugRoom = e.target.value;
-    try { localStorage.setItem('plugRoom', plugRoom); } catch { /* ignore */ }
-    if (model) renderPlugs(model);
-  });
+  const card = (id, title, kind) => {
+    $(id).innerHTML = `
+      <div class="hd"><h2>${title}</h2><span class="tag" id="${kind}-count"></span></div>
+      <select class="filter" id="${kind}-room" aria-label="Show ${kind}s in room"><option value="">All rooms</option></select>
+      <div class="dgroups" id="${kind}-rows"></div>`;
+    $(`#${kind}-room`).addEventListener('change', (e) => {
+      rooms[kind] = e.target.value;
+      try { localStorage.setItem(`${kind}Room`, rooms[kind]); } catch { /* ignore */ }
+      if (model) renderDeviceList(kind, kind === 'plug' ? model.catalogue.plugs : model.catalogue.lights);
+    });
+  };
+  card('#plugs', 'Plugs', 'plug');
+  card('#lights', 'Lights', 'light');
 }
 
 // Plugs marked important ask for confirmation before they are switched off (see the click handler).
@@ -390,23 +393,21 @@ function countText(groups) {
   return `${all.filter((i) => i.state === 'on').length} of ${all.length} on`;
 }
 
-function renderPlugs(m) {
-  const groups = m.catalogue.plugs;
+// One renderer for both lists: the room dropdown, the grouped rows and the "N of M on" count.
+function renderDeviceList(kind, groups) {
   // keep the dropdown in step with the rooms Home Control knows about (only rebuilt when they change)
-  const sel = $('#plug-room');
+  const sel = $(`#${kind}-room`);
   const optionsHtml = `<option value="">All rooms (${groups.reduce((n, g) => n + g.items.length, 0)})</option>${groups.map((g) => `<option value="${esc(g.name)}">${esc(g.name)} (${g.items.length})</option>`).join('')}`;
   if (sel._h !== optionsHtml) { sel.innerHTML = optionsHtml; sel._h = optionsHtml; }
-  if (plugRoom && !groups.some((g) => g.name === plugRoom)) plugRoom = ''; // a remembered room that no longer exists
-  sel.value = plugRoom;
-  const shown = groups.filter((g) => !plugRoom || g.name === plugRoom);
-  setHTML($('#plug-rows'), groupsHtml(groups, 'plug', plugRoom) || '<div class="empty">No plugs in this room.</div>');
-  $('#plug-count').textContent = countText(shown);
+  if (rooms[kind] && !groups.some((g) => g.name === rooms[kind])) rooms[kind] = ''; // a remembered room that no longer exists
+  sel.value = rooms[kind];
+  const shown = groups.filter((g) => !rooms[kind] || g.name === rooms[kind]);
+  setHTML($(`#${kind}-rows`), groupsHtml(groups, kind, rooms[kind]) || `<div class="empty">No ${kind}s in this room.</div>`);
+  $(`#${kind}-count`).textContent = countText(shown);
 }
 
-function renderLights(m) {
-  setHTML($('#light-rows'), groupsHtml(m.catalogue.lights, 'light', ''));
-  $('#light-count').textContent = countText(m.catalogue.lights);
-}
+const renderPlugs = (m) => renderDeviceList('plug', m.catalogue.plugs);
+const renderLights = (m) => renderDeviceList('light', m.catalogue.lights);
 
 // ---------- security + live cameras ----------
 // The camera tiles are built once and then only updated in place, so a redraw never tears down a playing video.

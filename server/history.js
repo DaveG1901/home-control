@@ -15,6 +15,21 @@ class History {
     this.points = [];
     this.pending = []; // samples not yet written to the database
     this.timer = null;
+    this.saved = 0;           // samples written to the database since this process started
+    this.lastSavedAt = null;
+    this.lastError = null;
+    this.initError = null;
+  }
+
+  /** Safe to show on /healthz: counts and times only, never the connection string. */
+  status() {
+    return {
+      database: !!this.pool,
+      pending: this.pending.length,
+      saved: this.saved,
+      lastSavedAt: this.lastSavedAt,
+      error: this.lastError || this.initError || null,
+    };
   }
 
   /** Start the periodic database write. Call stop() on shutdown to write whatever is left. */
@@ -39,12 +54,16 @@ class History {
     const params = [];
     batch.forEach((p, i) => {
       const o = i * 5;
-      values.push(`(${o + 1},${o + 2},${o + 3},${o + 4},${o + 5})`);
-      params.push(new Date(p.t), p.pv, p.load, p.batt, p.soc);
+      values.push(`($${o + 1},$${o + 2},$${o + 3},$${o + 4},$${o + 5})`); // ($1,$2,$3,$4,$5), ($6,...) placeholders
+      params.push(new Date(p.t).toISOString(), p.pv, p.load, p.batt, p.soc); // ISO text: portable across Postgres drivers
     });
     try {
       await this.pool.query(`INSERT INTO power_samples (ts, pv, load, batt, soc) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`, params);
+      this.saved += batch.length;
+      this.lastSavedAt = Date.now();
+      this.lastError = null;
     } catch (err) {
+      this.lastError = err.message;
       console.error(`[history] could not save ${batch.length} samples, will retry:`, err.message);
       this.pending = batch.concat(this.pending).slice(-MAX_PENDING);
     }

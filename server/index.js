@@ -39,6 +39,7 @@ async function start(config = defaultConfig) {
   const history = new History(pool);
   try { await history.init(); } catch (err) {
     console.error('[history] database unavailable, using memory only:', err.message);
+    history.initError = err.message;
     history.pool = null;
   }
   if (config.mode === 'demo') history.backfillDemo();
@@ -101,7 +102,7 @@ async function start(config = defaultConfig) {
   app.use(express.json({ limit: '10kb' }));
 
   const commit = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || null; // set by Render; shows which version is running
-app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()) }));
+app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status() }));
   app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
   app.post('/api/login', (req, res) => (sameOrigin(req) ? auth.login(req, res) : res.status(403).json({ error: 'Bad origin' })));
   app.post('/api/logout', (req, res) => auth.logout(req, res));

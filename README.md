@@ -57,14 +57,14 @@ checking. The problem does not occur on a home network or on Render.
   hls.js. The video never passes through this server; the server only fetches a stream address from HA for a signed-in
   session. Streams start when you open the Security tab (or tap a tile on the overview) and stop when you leave or hide the page.
   The first connection takes ~15 s while HA starts the stream. In live mode the page's security policy allows media from
-  your  origin only.
+  your `HA_URL` origin only.
 - **Devices tab:** every plug and house light, each switched on its own (there is no all-on/all-off button on purpose).
   Switching off something that is drawing more than 50 W asks first.
-- **Locked plugs:** the freezer and "office critical" plugs () and anything that powers a router, powerline or
-  camera PoE () cannot be switched from the app, because switching them off could do harm or cut your own way back
-  in. To change that, edit the  value in .
+- **Locked plugs:** the freezer and "office critical" plugs (`protected`) and anything that powers a router, powerline or
+  camera PoE (`network`) cannot be switched from the app, because switching them off could do harm or cut your own way back
+  in. To change that, edit the `lock` value in `server/entities.js`.
 - **Boost:** the main thermostat, each zone and hot water can be boosted for 30 min, 1 h or 2 h (zones heat to
-  , 21° by default, using ). Boost can be cancelled from the same card.
+  `heating.boost.temperature`, 21° by default, using `hive.boost_heating_on`). Boost can be cancelled from the same card.
 
 ## Safety model
 

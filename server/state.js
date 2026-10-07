@@ -9,6 +9,7 @@ const WEATHER = {
   rainy: 'Rain', snowy: 'Snow', 'snowy-rainy': 'Sleet', sunny: 'Sunny', windy: 'Windy', 'windy-variant': 'Windy',
 };
 
+const SPARE_TAU_S = 30;
 const BAD = new Set(['unavailable', 'unknown', 'none', '']);
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const round = (n, dp = 2) => (n === null ? null : Math.round(n * 10 ** dp) / 10 ** dp);
@@ -24,12 +25,16 @@ class Store extends EventEmitter {
     this.haConnected = false;
     this.fatal = null;
     this.ready = false; // true once the first full snapshot has arrived
+    this.now = () => Date.now(); // overridable in tests
+    this.spareAvg = null; // smoothed spare solar (kW), so the card does not flicker with every cloud
+    this.spareT = 0;
   }
 
   applyStates(list) {
     this.entities.clear();
     for (const s of list) if (this.watched.has(s.entity_id)) this.entities.set(s.entity_id, { state: s.state, attributes: s.attributes || {} });
     this.ready = true;
+    this._updateSpare();
     this.emit('change');
   }
 
@@ -38,8 +43,44 @@ class Store extends EventEmitter {
     const old = this.entities.get(entityId);
     if (!newState) this.entities.delete(entityId);
     else this.entities.set(entityId, { state: newState.state, attributes: newState.attributes || {} });
+    if (entityId === E.energy.pv || entityId === E.energy.load) this._updateSpare();
     if (this.ready) this._detectEvents(entityId, old, newState);
     this.emit('change');
+  }
+
+  /** Exponential moving average of (solar - home use), time constant SPARE_TAU_S. */
+  _updateSpare() {
+    const pv = this.num(E.energy.pv);
+    const load = this.num(E.energy.load);
+    if (pv === null || load === null) return;
+    const x = Math.max(0, pv - load);
+    const t = this.now();
+    if (this.spareAvg === null) this.spareAvg = x;
+    else this.spareAvg += (x - this.spareAvg) * (1 - Math.exp(-Math.max(0, t - this.spareT) / 1000 / SPARE_TAU_S));
+    this.spareT = t;
+  }
+
+  /** The "Solar surplus" card: spare solar, where it is going now, and which appliances it could cover. */
+  surplusModel(plugState, plugsById) {
+    const en = E.energy;
+    const pv = this.num(en.pv);
+    const load = this.num(en.load);
+    if (pv === null || load === null || this.spareAvg === null) return { state: 'unknown', spare: null, split: null, devices: [] };
+
+    const spare = pv < 0.05 ? 0 : Math.max(0, this.spareAvg);
+    const state = pv < 0.05 ? 'night' : spare < 0.2 ? 'low' : 'good';
+    const toBattery = this.isOn(en.battCharging) ? Math.abs(this.num(en.battPower) || 0) : 0;
+    const split = { home: round(Math.min(pv, load)), battery: round(toBattery), grid: round(this.num(en.gridExport) || 0) };
+
+    const devices = E.surplusDevices.map((d) => {
+      const plug = plugsById.get(d.id);
+      const p = plugState(plug);
+      const running = p.state === 'on' && p.watts !== null && p.watts > Math.max(30, d.kw * 150);
+      const share = d.kw > 0 ? clamp(spare / d.kw, 0, 1) : 0;
+      const fit = p.state === 'unavailable' ? 'unavailable' : running ? 'running' : share >= 0.9 ? 'good' : share >= 0.5 ? 'marginal' : 'no';
+      return { id: d.id, name: plug.name, kw: d.kw, state: p.state, watts: p.watts, fit, solarShare: Math.round(share * 100) };
+    });
+    return { state, spare: round(spare), split, devices };
   }
 
   _detectEvents(entityId, old, next) {
@@ -144,6 +185,7 @@ class Store extends EventEmitter {
       connection: { mode: this.mode, ha: this.haConnected, ready: this.ready, error: this.fatal },
       environment: { outsideTemp: round(n(E.environment.outsideTemp), 1), weather: w ? WEATHER[w] || w : null },
       energy, today, heating, security, devices, consumers,
+      surplus: this.surplusModel(plugState, byId),
       activity: this.activity.slice(0, 12),
     };
   }

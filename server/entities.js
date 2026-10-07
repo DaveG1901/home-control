@@ -85,6 +85,14 @@ const plugs = [
   { id: 'living_extension', name: 'Living room extension', switch: 'switch.living_room_extension', power: 'sensor.living_room_extension_current_consumption' },
 ];
 
+// Appliances offered on the "Solar surplus" card, with their typical draw in kW.
+// Must be plugs above with control: true. Switching a plug only powers the socket: the appliance itself still needs starting.
+const surplusDevices = [
+  { id: 'dishwasher', kw: 1.2 },
+  { id: 'tumble_dryer', kw: 2.2 },
+  { id: 'garage_heater', kw: 2.0 },
+];
+
 // Which quick-control tiles to show, in order.
 const quickControls = ['dishwasher', 'tumble_dryer', 'garage_heater', 'purifier', 'kids_laptops', 'freezer'];
 
@@ -153,4 +161,4 @@ function watchedEntities() {
   return set;
 }
 
-module.exports = { energy, environment, heating, doorbells, cameras, plugs, quickControls, buildCommands, watchedEntities };
+module.exports = { energy, environment, heating, doorbells, cameras, plugs, quickControls, surplusDevices, buildCommands, watchedEntities };

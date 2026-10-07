@@ -155,7 +155,7 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
     const acc = { soc: 12.1, dailyPv: 4.98, dailyLoad: 14.29, dailyImport: 6.45, dailyExport: 0 };
     const t = setInterval(() => {
       tick++;
-      const h = londonHour(Date.now());
+      const h = process.env.DEMO_HOUR ? parseFloat(process.env.DEMO_HOUR) : londonHour(Date.now()); // DEMO_HOUR=12 pretends it is midday
       const sun = h < 6.3 || h > 17.5 ? 0 : Math.sin(((h - 6.3) / 11.2) * Math.PI) ** 1.4;
       const pv = Math.max(0, 3.4 * sun * (0.8 + 0.2 * Math.sin(tick / 7)) + (sun ? (Math.random() - 0.5) * 0.08 : 0));
       let load = 0.45 + 0.1 * Math.sin(tick / 11) + Math.random() * 0.05;

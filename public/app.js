@@ -177,6 +177,55 @@ function renderToday(m) {
     </div>`);
 }
 
+function renderSurplus(m) {
+  const s = m.surplus;
+  const heading = {
+    good: ['Spare solar available', 'Solar is producing more than the house needs right now.'],
+    low: ['Little spare right now', 'Solar is mostly covering the house, with little left over.'],
+    night: ['No solar right now', 'Check back when the sun is up.'],
+    unknown: ['Waiting for data', 'Solar readings are not available yet.'],
+  }[s.state] || ['', ''];
+  const sp = s.split;
+  const total = sp ? sp.home + sp.battery + sp.grid : 0;
+  const pct = (v) => (total > 0 ? (v / total) * 100 : 0);
+  const bar = sp && total > 0.01
+    ? `<div class="splitbar"><i style="width:${pct(sp.home)}%;background:#818cf8"></i><i style="width:${pct(sp.battery)}%;background:#60a5fa"></i><i style="width:${pct(sp.grid)}%;background:#22d3ee"></i></div>`
+    : '<div class="splitbar"></div>';
+  const legend = sp
+    ? `<div class="sp-legend"><span style="--c:#818cf8">Home <b>${fx(sp.home)} kW</b></span><span style="--c:#60a5fa">Battery <b>${fx(sp.battery)} kW</b></span><span style="--c:#22d3ee">Exported <b>${fx(sp.grid)} kW</b></span></div>`
+    : '';
+  const fitText = (d) => ({
+    running: 'Running now',
+    good: 'Enough sun to run on solar',
+    marginal: `About ${d.solarShare}% on solar`,
+    no: s.state === 'night' ? 'No solar' : 'Not enough surplus',
+    unavailable: 'Unavailable',
+  }[d.fit]);
+  const devs = s.devices.map((d) => {
+    const on = opt(`plug:${d.id}`, d.state) === 'on';
+    const sw = d.fit === 'unavailable'
+      ? '<button class="sw lock" disabled title="Unavailable"></button>'
+      : `<button class="sw${on ? ' on' : ''}" data-cmd="plug:${esc(d.id)}" data-toggle aria-label="${esc(d.name)}"></button>`;
+    return `<div class="spd ${esc(d.fit)}"><div class="top"><b>${esc(d.name)}</b>${sw}</div>
+      <small>Typically ${fx(d.kw, 1)} kW</small><span class="fit ${esc(d.fit)}">${esc(fitText(d))}</span></div>`;
+  }).join('');
+
+  setHTML($('#surplus'), `
+    <div class="hd"><h2>Solar surplus</h2><span class="tag${s.state === 'good' ? '' : ' warn'}">${esc(heading[0])}</span></div>
+    <div class="surplus">
+      <div>
+        <div class="sp-big">${s.spare === null ? dash : fx(s.spare)}<em>kW spare</em></div>
+        <div class="sub" style="margin-top:6px">${esc(heading[1])}</div>
+        ${bar}${legend}
+        <div class="sub" style="margin-top:10px;font-size:12px">The bar shows where your solar is going right now. The spare figure is a 30 second average, so it doesn't jump with every cloud.</div>
+      </div>
+      <div>
+        <div class="sp-devs">${devs}</div>
+        <div class="sub" style="margin-top:12px;font-size:12px">Switching a plug only powers the socket: start the appliance yourself, and only run dryers and heaters while you are home.</div>
+      </div>
+    </div>`);
+}
+
 function renderHeating(m) {
   const h = m.heating;
   const main = h.main;
@@ -309,6 +358,7 @@ function renderAll() {
   renderHeader(m);
   updateEnergy(m.energy);
   renderToday(m);
+  renderSurplus(m);
   renderHeating(m);
   renderSecurity(m);
   renderControls(m);
@@ -339,10 +389,10 @@ function connect() {
 // ---------- views (side navigation) ----------
 const VIEWS = {
   overview: null, // everything
-  energy: ['energy', 'today', 'power', 'consumers'],
+  energy: ['energy', 'today', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],
-  devices: ['controls', 'consumers'],
+  devices: ['surplus', 'controls', 'consumers'],
   reports: ['power', 'today'],
 };
 const VIEW_TITLES = { overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', devices: 'Devices', reports: 'Reports' };

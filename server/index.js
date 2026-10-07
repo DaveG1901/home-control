@@ -117,6 +117,13 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
 
   app.get('/api/state', (req, res) => res.json(store.viewModel()));
 
+  // The page calls this when it comes back to the foreground, so the camera streams are started ahead of a visit to Security.
+  app.post('/api/cameras/warm', (req, res) => {
+    if (!sameOrigin(req)) return res.status(403).json({ error: 'Bad origin' });
+    if (config.mode === 'live') warmer.kick();
+    return res.json({ ok: true });
+  });
+
   // The HLS player library, served from node_modules (only this one file).
   app.get('/vendor/hls.min.js', (req, res) => res.sendFile(path.join(__dirname, '..', 'node_modules', 'hls.js', 'dist', 'hls.min.js'), { maxAge: '7d' }));
 
@@ -175,15 +182,9 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
 
-  // While anyone has the app open, keep the camera streams running in Home Assistant so they open in a second or two
-  // instead of ~10 s. Only in live mode, and only while somebody is looking (plus a minute's grace).
-  let lastViewerAt = 0;
-  const warmer = new CameraWarmer({
-    ha, cameras, baseUrl: config.haUrl,
-    isNeeded: () => wss.clients.size > 0 || Date.now() - lastViewerAt < 60_000,
-    isConnected: () => store.haConnected,
-  });
-  if (config.mode === 'live') warmer.start();
+  // Start the camera streams in Home Assistant the moment someone opens the app, so they are already running (for about a
+  // minute) if the Security tab is opened next. Live mode only: the demo has no real cameras.
+  const warmer = new CameraWarmer({ ha, cameras, baseUrl: config.haUrl, isConnected: () => store.haConnected });
   server.on('upgrade', (req, socket, head) => {
     const { pathname } = new URL(req.url, 'http://localhost');
     if (pathname !== '/live' || !auth.isAuthed(req) || !sameOrigin(req)) {
@@ -195,8 +196,6 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   wss.on('connection', (ws) => {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
-    lastViewerAt = Date.now();
-    ws.on('close', () => { lastViewerAt = Date.now(); });
     if (config.mode === 'live') warmer.kick(); // start the streams the moment the app opens
     ws.send(JSON.stringify({ type: 'state', data: store.viewModel() }));
   });
@@ -225,7 +224,6 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
     clearInterval(sampler); clearInterval(heartbeat);
     ha.stop();
     bins.stop();
-    warmer.stop();
     await history.stop(); // write any unsaved chart samples
     for (const c of wss.clients) c.terminate();
     await new Promise((r) => server.close(r));

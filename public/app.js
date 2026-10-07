@@ -584,7 +584,10 @@ function syncStreams() {
     if (want) t.stream.start(); else t.stream.stop();
   }
 }
-document.addEventListener('visibilitychange', syncStreams);
+document.addEventListener('visibilitychange', () => {
+  syncStreams();
+  if (document.visibilityState === 'visible') fetch('/api/cameras/warm', { method: 'POST' }).catch(() => {}); // start the streams ahead of a visit to Security
+});
 window.addEventListener('pagehide', () => { for (const t of camTiles.values()) t.stream.stop(); });
 
 function renderSecurity(m) {

@@ -1,6 +1,7 @@
 # Render blueprint. Starter plan: always on (the free plan sleeps after 15 minutes without traffic).
-# Secrets are entered in the Render dashboard (never committed). After the first deploy works in demo mode,
-# switch to live by adding HA_TOKEN there and changing HA_MODE to "live" (see README).
+# Secrets are entered in the Render dashboard (never committed).
+# IMPORTANT: Render re-applies the values in this file whenever the file changes, so anything set by hand in the dashboard
+# (e.g. HA_MODE) must ALSO be set here, or it gets reset on the next sync.
 services:
   - type: web
     name: home-control
@@ -15,9 +16,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: HA_MODE
-        value: demo
+        value: live            # the real house. (Use demo only to try the app with sample data.)
       - key: HA_URL
         value: https://home.dgarwood.co.uk
+      - key: HA_TOKEN
+        sync: false            # secret: set in the Render dashboard, never in this file
       - key: SESSION_SECRET
         generateValue: true
       - key: APP_PASSWORD

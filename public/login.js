@@ -23,3 +23,16 @@ form.addEventListener('submit', async (e) => {
     go.disabled = false;
   }
 });
+
+// show / hide the password while typing
+const pw = document.getElementById('pw');
+const eye = document.getElementById('eye');
+eye.addEventListener('click', () => {
+  const show = pw.type === 'password';
+  pw.type = show ? 'text' : 'password';
+  eye.classList.toggle('shown', show);
+  eye.setAttribute('aria-pressed', String(show));
+  eye.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+  eye.title = show ? 'Hide password' : 'Show password';
+  pw.focus();
+});

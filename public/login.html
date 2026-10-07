@@ -18,7 +18,16 @@ h1{font-size:22px;font-weight:600;letter-spacing:-.02em}
 p{color:var(--mute);margin:6px 0 22px;font-size:14px}
 input{width:100%;padding:13px 15px;border-radius:13px;border:1px solid var(--line);background:rgba(8,20,48,.7);color:var(--text);font:inherit;font-size:15px;outline:none}
 input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
-button{width:100%;margin-top:14px;padding:13px;border:0;border-radius:13px;background:var(--blue);color:#fff;font:inherit;font-weight:600;font-size:15px;cursor:pointer;box-shadow:0 6px 20px rgba(59,130,246,.4)}
+.field{position:relative}
+.field input{padding-right:48px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:38px;height:38px;margin:0;padding:0;display:grid;place-items:center;background:none;border:0;border-radius:10px;box-shadow:none;color:var(--mute);cursor:pointer}
+.eye:hover{color:var(--text);background:rgba(96,165,250,.12)}
+.eye:focus-visible{outline:2px solid #60a5fa}
+.eye svg{width:20px;height:20px}
+.eye .off{display:none}
+.eye.shown .on{display:none}
+.eye.shown .off{display:block}
+button#go{width:100%;margin-top:14px;padding:13px;border:0;border-radius:13px;background:var(--blue);color:#fff;font:inherit;font-weight:600;font-size:15px;cursor:pointer;box-shadow:0 6px 20px rgba(59,130,246,.4)}
 button:disabled{opacity:.6;cursor:wait}
 #err{min-height:20px;margin-top:12px;font-size:13px;color:#fca5a5}
 </style>
@@ -28,7 +37,13 @@ button:disabled{opacity:.6;cursor:wait}
   <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#04122e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></div>
   <h1>Home Control</h1>
   <p>Sign in to continue</p>
-  <input type="password" id="pw" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
+  <div class="field">
+    <input type="password" id="pw" name="password" placeholder="Password" autocomplete="current-password" autofocus required>
+    <button type="button" class="eye" id="eye" aria-label="Show password" aria-pressed="false" title="Show password">
+      <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.9 17.9A10.1 10.1 0 0112 19C5.6 19 2 12 2 12a18 18 0 015.1-5.9M9.9 5.1A9.7 9.7 0 0112 5c6.4 0 10 7 10 7a18 18 0 01-2.2 3.2"/><path d="M14.1 14.1a3 3 0 11-4.2-4.2"/><path d="M2 2l20 20"/></svg>
+    </button>
+  </div>
   <button type="submit" id="go">Sign in</button>
   <div id="err" role="alert"></div>
 </form>

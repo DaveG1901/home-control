@@ -728,11 +728,11 @@ function connect() {
 
 // ---------- views (side navigation) ----------
 const VIEWS = {
-  overview: ['energy', 'today', 'surplus', 'bins', 'heating', 'security', 'power', 'controls', 'activity', 'consumers'],
+  overview: ['energy', 'today', 'heating', 'security', 'power', 'bins', 'controls', 'activity', 'consumers'],
   energy: ['energy', 'today', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],
-  devices: ['plugs', 'lights', 'surplus', 'consumers'],
+  devices: ['plugs', 'lights'],
   reports: ['power', 'today'],
 };
 const VIEW_TITLES = { overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', devices: 'Devices', reports: 'Reports' };

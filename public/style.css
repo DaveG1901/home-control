@@ -276,11 +276,6 @@ main,.card,.top>div{min-width:0}
 a.tag{text-decoration:none}
 a.tag:hover{background:rgba(59,130,246,.3)}
 
-/* Devices page: the lists first, then the solar helper */
-.grid[data-view=devices] #plugs{order:1}
-.grid[data-view=devices] #lights{order:2}
-.grid[data-view=devices] #surplus{order:3}
-.grid[data-view=devices] #consumers{order:4}
 /* appliance names in the solar tiles may wrap instead of being cut off */
 .spd .top{align-items:flex-start}
 .spd .top b{white-space:normal;overflow:visible;text-overflow:clip}
@@ -307,7 +302,7 @@ select.filter option{background:#0e1d42;color:#e8f0ff}
 .bin-then .dots{display:flex;gap:5px}
 .bin-then i{width:12px;height:12px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
 /* in the Energy and Devices views the solar card has no neighbour: let it use the full row */
-.grid[data-view=energy] #surplus,.grid[data-view=devices] #surplus{grid-column:span 12}
+.grid[data-view=energy] #surplus{grid-column:span 12}
 
 /* next-bin-day chip in the header */
 a.chip{text-decoration:none}
@@ -335,4 +330,10 @@ a.chip{text-decoration:none}
   .chip.st.ok .txt{display:none}
   .chip.st.ok .dot{width:10px;height:10px}
   h1{font-size:21px}
+}
+
+/* Home page: pair the cards so each row is full (wide screens only) */
+@media(min-width:1101px){
+  .grid[data-view=overview] #activity{grid-column:span 7}
+  .grid[data-view=overview] #consumers{grid-column:span 12}
 }

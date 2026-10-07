@@ -420,7 +420,7 @@ const camTiles = new Map(); // camera id -> { el, view, video, msg, label, statu
 
 const STREAM_TEXT = {
   idle: 'Tap to watch live',
-  connecting: 'Connecting… this can take 15 seconds',
+  connecting: 'Connecting… up to 10 seconds the first time',
   live: '',
   error: 'Stream unavailable, retrying…',
   demo: 'Demo mode: no live video',

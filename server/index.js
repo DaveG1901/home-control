@@ -13,6 +13,7 @@ const { createAuth } = require('./auth');
 const { buildCommands, cameras } = require('./entities');
 const { createFakeHa } = require('./fakeHa');
 const { BinService, demoEvents } = require('./bins');
+const { CameraWarmer } = require('./warm');
 const { bins: binsConfig } = require('./entities');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -102,7 +103,7 @@ async function start(config = defaultConfig) {
   app.use(express.json({ limit: '10kb' }));
 
   const commit = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || null; // set by Render; shows which version is running
-app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status() }));
+app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status(), cameraWarmup: warmer.status() }));
   app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
   app.post('/api/login', (req, res) => (sameOrigin(req) ? auth.login(req, res) : res.status(403).json({ error: 'Bad origin' })));
   app.post('/api/logout', (req, res) => auth.logout(req, res));
@@ -173,6 +174,16 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   // ---- live updates over WebSocket ----
   const server = http.createServer(app);
   const wss = new WebSocketServer({ noServer: true });
+
+  // While anyone has the app open, keep the camera streams running in Home Assistant so they open in a second or two
+  // instead of ~10 s. Only in live mode, and only while somebody is looking (plus a minute's grace).
+  let lastViewerAt = 0;
+  const warmer = new CameraWarmer({
+    ha, cameras, baseUrl: config.haUrl,
+    isNeeded: () => wss.clients.size > 0 || Date.now() - lastViewerAt < 60_000,
+    isConnected: () => store.haConnected,
+  });
+  if (config.mode === 'live') warmer.start();
   server.on('upgrade', (req, socket, head) => {
     const { pathname } = new URL(req.url, 'http://localhost');
     if (pathname !== '/live' || !auth.isAuthed(req) || !sameOrigin(req)) {
@@ -184,6 +195,9 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   wss.on('connection', (ws) => {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
+    lastViewerAt = Date.now();
+    ws.on('close', () => { lastViewerAt = Date.now(); });
+    if (config.mode === 'live') warmer.kick(); // start the streams the moment the app opens
     ws.send(JSON.stringify({ type: 'state', data: store.viewModel() }));
   });
 
@@ -211,6 +225,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
     clearInterval(sampler); clearInterval(heartbeat);
     ha.stop();
     bins.stop();
+    warmer.stop();
     await history.stop(); // write any unsaved chart samples
     for (const c of wss.clients) c.terminate();
     await new Promise((r) => server.close(r));

@@ -84,8 +84,9 @@ checking. The problem does not occur on a home network or on Render.
    to check the deployment, then set `HA_MODE=live`, `HA_URL`, `HA_TOKEN`.
 3. Optional: create a Neon Postgres database and add its connection string as `DATABASE_URL` so chart history survives restarts.
 
-Free-tier caveat: Render's free web service sleeps after ~15 minutes idle. While asleep the link to HA is closed and
-events are missed. That is fine for a trial; move to a small always-on instance for real use.
+Hosting: this runs on Render's Starter plan (always on, about $7/month). On the free plan the service sleeps after 15
+minutes without traffic, which closes the link to Home Assistant and misses events. `/healthz` reports `uptimeSeconds`: if
+it keeps growing between visits the service is not sleeping.
 
 ## Known gaps
 

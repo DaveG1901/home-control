@@ -1,11 +1,11 @@
-# Render blueprint for the free-tier trial.
+# Render blueprint. Starter plan: always on (the free plan sleeps after 15 minutes without traffic).
 # Secrets are entered in the Render dashboard (never committed). After the first deploy works in demo mode,
 # switch to live by adding HA_TOKEN there and changing HA_MODE to "live" (see README).
 services:
   - type: web
     name: home-control
     runtime: node
-    plan: free
+    plan: starter
     buildCommand: npm install --omit=dev
     startCommand: node server/index.js
     healthCheckPath: /healthz

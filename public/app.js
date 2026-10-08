@@ -95,25 +95,26 @@ document.addEventListener('click', (e) => {
     if (t.dataset.warn === 'network') question = `${name} powers your network or cameras. Switching it off could cut your connection, and you may not be able to switch it back on from here. Switch it off?`;
     else if (t.dataset.warn === 'critical') question = `${name} is marked as important. Switch it off?`;
   }
-  if (question) { ask(question).then((yes) => { if (yes) run(t, id, value); }); return; }
+  if (question) { ask(question, [{ label: 'Switch off', value: 'yes', danger: true }]).then((a) => { if (a === 'yes') run(t, id, value); }); return; }
   run(t, id, value);
 });
 
-// Asks a yes/no question in the page itself. Resolves true only for "Switch off"; Cancel, Esc or a tap outside is "no".
+// Asks a question in the page itself (browser pop-ups may be blocked). Resolves to the chosen button's value, or null for
+// Cancel, Esc or a tap outside the box.
 let answer = null;
-function ask(question) {
+function ask(question, choices) {
   const dlg = $('#ask');
-  if (answer) answer(false); // a question still open is dropped
+  if (answer) answer(null); // a question still open is dropped
   $('#ask-text').textContent = question;
+  $('#ask-btns').innerHTML = `<button type="button" class="btn" data-a="" autofocus>Cancel</button>${choices.map((c) => `<button type="button" class="btn${c.danger ? ' danger' : ''}" data-a="${esc(c.value)}">${esc(c.label)}</button>`).join('')}`;
   return new Promise((resolve) => {
-    answer = (yes) => { answer = null; if (dlg.open) dlg.close(); resolve(yes); };
+    answer = (a) => { answer = null; if (dlg.open) dlg.close(); resolve(a || null); };
     dlg.showModal();
   });
 }
-$('#ask-yes').addEventListener('click', () => answer && answer(true));
-$('#ask-no').addEventListener('click', () => answer && answer(false));
-$('#ask').addEventListener('cancel', (e) => { e.preventDefault(); if (answer) answer(false); });
-$('#ask').addEventListener('click', (e) => { if (e.target === e.currentTarget && answer) answer(false); }); // the backdrop
+$('#ask-btns').addEventListener('click', (e) => { const b = e.target.closest('[data-a]'); if (b && answer) answer(b.dataset.a); });
+$('#ask').addEventListener('cancel', (e) => { e.preventDefault(); if (answer) answer(null); });
+$('#ask').addEventListener('click', (e) => { if (e.target === e.currentTarget && answer) answer(null); }); // the backdrop
 
 function run(t, id, value) {
   if (t.hasAttribute('data-close')) openBoost = null;
@@ -124,7 +125,11 @@ function run(t, id, value) {
 }
 
 document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  const where = await ask('Sign out of this device, or of every device signed in to Home Control?', [
+    { label: 'Everywhere', value: 'all', danger: true }, { label: 'This device', value: 'here' }]);
+  if (!where) return;
+  const res = await fetch(where === 'all' ? '/api/logout-all' : '/api/logout', { method: 'POST' }).catch(() => null);
+  if (where === 'all' && (!res || !res.ok)) { toast('Could not sign out everywhere. Try again.'); return; }
   location.href = '/login';
 }));
 

@@ -3,6 +3,11 @@
 const form = document.getElementById('f');
 const err = document.getElementById('err');
 const go = document.getElementById('go');
+const codeRow = document.getElementById('code-row');
+const code = document.getElementById('code');
+
+// Ask for the authenticator code only when the server wants one.
+fetch('/api/login-options').then((r) => r.json()).then((o) => { codeRow.hidden = !o.code; code.required = !!o.code; }).catch(() => {});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -12,11 +17,12 @@ form.addEventListener('submit', async (e) => {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: document.getElementById('pw').value }),
+      body: JSON.stringify({ password: document.getElementById('pw').value, code: code.value.trim() }),
     });
     if (res.ok) { location.href = '/'; return; }
     const body = await res.json().catch(() => ({}));
     err.textContent = body.error || 'Sign in failed';
+    code.value = ''; // a code works only once
   } catch {
     err.textContent = 'Could not reach the server';
   } finally {

@@ -82,3 +82,27 @@ test('status() never exposes anything but counts, times and an error message', a
   assert.deepEqual(Object.keys(h.status()).sort(), ['database', 'error', 'lastSavedAt', 'pending', 'saved']);
   assert.equal(new History(null).status().database, false);
 });
+
+test('real Postgres: "sign out everywhere" is remembered across a restart', async () => {
+  const { loadValidAfter, saveValidAfter } = require('../server/settings');
+  const { createAuth } = require('../server/auth');
+  const db = poolFor(new PGlite());
+  assert.equal(await loadValidAfter(db), 0, 'nothing saved yet');
+
+  const opts = { password: 'pw-123456', secret: 'k'.repeat(32), loadValidAfter: () => loadValidAfter(db), saveValidAfter: (ms) => saveValidAfter(db, ms) };
+  const res = () => { const h = {}; return { h, setHeader: (k, v) => { h[k] = v; }, status() { return this; }, json() { return this; } }; };
+  const first = createAuth(opts);
+  await first.init();
+  const r = res();
+  first.login({ ip: '1.1.1.1', headers: {}, body: { password: 'pw-123456' } }, r);
+  const cookie = r.h['Set-Cookie'].split(';')[0];
+  await new Promise((ok) => setTimeout(ok, 5));
+  await first.signOutEverywhere();
+  first.stop();
+
+  const second = createAuth(opts); // a new process
+  await second.init();
+  assert.equal(second.isAuthed({ headers: { cookie } }), false, 'the old session stays ended after a restart');
+  assert.ok(await loadValidAfter(db) > 0);
+  second.stop();
+});

@@ -10,6 +10,7 @@ const { HAClient } = require('./ha');
 const { Store } = require('./state');
 const { History } = require('./history');
 const { createAuth } = require('./auth');
+const settings = require('./settings');
 const { buildCommands, cameras } = require('./entities');
 const { createFakeHa } = require('./fakeHa');
 const { BinService, demoEvents } = require('./bins');
@@ -76,7 +77,13 @@ async function start(config = defaultConfig) {
   const sampler = setInterval(() => { if (store.haConnected && store.ready) history.add(store.sample()); }, SAMPLE_EVERY_MS);
 
   // ---- web app ----
-  const auth = createAuth({ password: config.appPassword, secret: config.sessionSecret, secure: config.production });
+  // "Sign out everywhere" is remembered in the database (when there is one) so a restart does not undo it.
+  const auth = createAuth({
+    password: config.appPassword, secret: config.sessionSecret, secure: config.production, totpSecret: config.totpSecret,
+    loadValidAfter: () => settings.loadValidAfter(history.pool),
+    saveValidAfter: (ms) => settings.saveValidAfter(history.pool, ms),
+  });
+  await auth.init();
   const boostMemory = new Map(); // zone id -> the mode it was in before an app-started boost
   const commands = buildCommands({
     mode: (id) => { const e = store.raw(id); return e ? e.state : null; },
@@ -96,6 +103,7 @@ async function start(config = defaultConfig) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
+    if (config.production) res.setHeader('Strict-Transport-Security', 'max-age=31536000'); // browsers only ever use HTTPS here
     res.setHeader('Content-Security-Policy',
       `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' ws://${host} wss://${host} ${haOrigin}; media-src 'self' blob: ${haOrigin}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
     next();
@@ -103,16 +111,32 @@ async function start(config = defaultConfig) {
   app.use(express.json({ limit: '10kb' }));
 
   const commit = (process.env.RENDER_GIT_COMMIT || '').slice(0, 7) || null; // set by Render; shows which version is running
-app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status(), cameraWarmup: warmer.status() }));
+  // Public: just enough for Render's health check and to see which version is running. The details are behind the login.
+  app.get('/healthz', (req, res) => res.json({ ok: true, commit }));
   app.get('/login', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'login.html')));
+  app.get('/api/login-options', (req, res) => res.json({ code: auth.codeRequired }));
   app.post('/api/login', (req, res) => (sameOrigin(req) ? auth.login(req, res) : res.status(403).json({ error: 'Bad origin' })));
-  app.post('/api/logout', (req, res) => auth.logout(req, res));
+  app.post('/api/logout', (req, res) => (sameOrigin(req) ? auth.logout(req, res) : res.status(403).json({ error: 'Bad origin' })));
 
   // Everything below requires a session.
   app.use((req, res, next) => {
     if (OPEN_PATHS.has(req.path) || auth.isAuthed(req)) return next();
     if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Not signed in' });
     return res.redirect('/login');
+  });
+  app.use(auth.renew);
+
+  app.get('/api/health', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status(), cameraWarmup: warmer.status() }));
+
+  // Ends every session on every device, then closes their live connections.
+  app.post('/api/logout-all', async (req, res) => {
+    if (!sameOrigin(req)) return res.status(403).json({ error: 'Bad origin' });
+    try { await auth.signOutEverywhere(); } catch (err) {
+      console.error('[auth] could not save sign-out time:', err.message);
+      return res.status(500).json({ error: 'Could not sign out everywhere, try again' });
+    }
+    for (const c of wss.clients) c.close(4001, 'Signed out');
+    return auth.logout(req, res);
   });
 
   app.get('/api/state', (req, res) => res.json(store.viewModel()));
@@ -143,7 +167,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
       return res.json({ url: `${config.haUrl}${p}` });
     } catch (err) {
       console.error(`[camera] ${cam.id} stream failed:`, err.message);
-      return res.status(502).json({ error: err.message });
+      return res.status(502).json({ error: 'Home Assistant could not start this camera' });
     }
   });
 
@@ -169,8 +193,8 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
       store.log(cmd.describe(value), 'You');
       return res.json({ ok: true });
     } catch (err) {
-      console.error(`[cmd] ${id} failed:`, err.message);
-      return res.status(502).json({ error: err.message });
+      console.error(`[cmd] ${id} failed:`, err.message); // the details stay in the server log
+      return res.status(502).json({ error: 'Home Assistant did not accept that' });
     }
   });
 
@@ -180,20 +204,29 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
 
   // ---- live updates over WebSocket ----
   const server = http.createServer(app);
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 }); // the browser only ever sends pongs
 
   // Start the camera streams in Home Assistant the moment someone opens the app, so they are already running (for about a
   // minute) if the Security tab is opened next. Live mode only: the demo has no real cameras.
   const warmer = new CameraWarmer({ ha, cameras, baseUrl: config.haUrl, isConnected: () => store.haConnected });
   server.on('upgrade', (req, socket, head) => {
-    const { pathname } = new URL(req.url, 'http://localhost');
-    if (pathname !== '/live' || !auth.isAuthed(req) || !sameOrigin(req)) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+    socket.on('error', () => {});
+    try {
+      const { pathname } = new URL(req.url, 'http://localhost');
+      if (pathname !== '/live' || !auth.isAuthed(req) || !sameOrigin(req)) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+        return socket.destroy();
+      }
+      return wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+    } catch (err) {
+      // nothing a visitor sends here may take the server down
+      console.error('[live] bad upgrade request:', err.message);
       return socket.destroy();
     }
-    return wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
+    ws.cookie = req.headers.cookie; // re-checked by the heartbeat: the connection ends when the session does
+    ws.on('error', (err) => console.warn('[live] connection closed:', err.message)); // e.g. an oversized message; never fatal
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     if (config.mode === 'live') warmer.kick(); // start the streams the moment the app opens
@@ -211,7 +244,11 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
     }, 250);
   });
   const heartbeat = setInterval(() => {
-    for (const c of wss.clients) { if (!c.isAlive) { c.terminate(); continue; } c.isAlive = false; c.ping(); }
+    for (const c of wss.clients) {
+      if (!auth.isAuthed({ headers: { cookie: c.cookie } })) { c.close(4001, 'Signed out'); continue; }
+      if (!c.isAlive) { c.terminate(); continue; }
+      c.isAlive = false; c.ping();
+    }
   }, 30_000);
 
   // Without a password only listen on localhost.
@@ -221,7 +258,7 @@ app.get('/healthz', (req, res) => res.json({ ok: true, ha: store.haConnected, mo
   if (!auth.enabled) console.warn('[auth] APP_PASSWORD not set: login disabled, listening on 127.0.0.1 only');
 
   async function close() {
-    clearInterval(sampler); clearInterval(heartbeat);
+    clearInterval(sampler); clearInterval(heartbeat); auth.stop();
     ha.stop();
     bins.stop();
     await history.stop(); // write any unsaved chart samples

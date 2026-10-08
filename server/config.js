@@ -9,6 +9,7 @@ const config = {
   haToken: env.HA_TOKEN || '',
   appPassword: env.APP_PASSWORD || '',
   sessionSecret: env.SESSION_SECRET || '',
+  totpSecret: (env.TOTP_SECRET || '').trim(), // authenticator-app codes at sign-in (npm run totp:setup)
   databaseUrl: env.DATABASE_URL || '',
   production: env.NODE_ENV === 'production',
 };
@@ -24,6 +25,9 @@ function validate(c) {
     // Exposed to the internet and able to switch things: never run without a password.
     if (c.appPassword.length < 8) problems.push('APP_PASSWORD (min 8 chars) is required in production');
     if (c.sessionSecret.length < 32) problems.push('SESSION_SECRET (min 32 chars) is required in production');
+  }
+  if (c.totpSecret) {
+    try { require('./totp').createTotp(c.totpSecret); } catch (err) { problems.push(err.message); }
   }
   return problems;
 }

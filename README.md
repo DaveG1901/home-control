@@ -69,13 +69,21 @@ checking. The problem does not occur on a home network or on Render.
 
 ## Safety model
 
-- The dashboard can only command what is listed in `buildCommands()` in `server/entities.js`. The freezer and "office
-  critical" plugs are deliberately **not** listed, so they cannot be switched off from the app whatever a client sends.
-- Only entities the app watches are ever stored or sent to the browser; the rest of HA is never exposed.
-- Single-password login, signed HttpOnly SameSite=Strict cookie, login rate-limited (5 failures = 15 min lock),
-  origin checks on commands and the live socket. In production the app **refuses to start** without `APP_PASSWORD`
-  and `SESSION_SECRET`.
-- Use a dedicated non-admin HA user for the token so a leaked token cannot administer HA.
+- The dashboard can only command what is listed in `buildCommands()` in `server/entities.js`, with checked values.
+  Plugs marked `critical` or `network` ask before they are switched off.
+- Only entities the app watches are ever stored or sent to the browser; the rest of HA is never exposed. Errors from HA
+  are logged on the server, not passed to the browser.
+- **Sign-in:** the password, plus a 6-digit code from an authenticator app when `TOTP_SECRET` is set (recommended:
+  `npm run totp:setup`, add the key to the app, `npm run totp:check <code>`, then add `TOTP_SECRET` in Render). A code
+  works once. Wrong attempts: 5 from one address = 15 minute lock; 30 from anywhere in an hour = all sign-ins pause.
+  Failed attempts are logged with the address.
+- **Sessions:** signed HttpOnly SameSite=Strict Secure cookie. Ends after 7 days unused, and 30 days after signing in
+  whatever happens. Sign out offers "This device" or "Everywhere"; "Everywhere" ends every session (remembered in the
+  database, so a restart does not undo it) and closes their live connections. Changing `SESSION_SECRET` does the same.
+- Origin checks on sign-in, sign-out, commands and the live socket; HTTPS-only (HSTS) in production; the live socket
+  accepts tiny messages only. In production the app **refuses to start** without `APP_PASSWORD` and `SESSION_SECRET`.
+- `/healthz` (public, used by Render) says only `ok` and the version; `/api/health` (signed in) has the details.
+- The HA token belongs to a dedicated non-admin HA user ("dashboard"), so a leaked token cannot administer HA.
 
 ## Deploy the free-tier trial (Render + optional Neon)
 
@@ -85,8 +93,8 @@ checking. The problem does not occur on a home network or on Render.
 3. Optional: create a Neon Postgres database and add its connection string as `DATABASE_URL` so chart history survives restarts.
 
 Hosting: this runs on Render's Starter plan (always on, about $7/month). On the free plan the service sleeps after 15
-minutes without traffic, which closes the link to Home Assistant and misses events. `/healthz` reports `uptimeSeconds`: if
-it keeps growing between visits the service is not sleeping.
+minutes without traffic, which closes the link to Home Assistant and misses events. `/api/health` (signed in) reports
+`uptimeSeconds`: if it keeps growing between visits the service is not sleeping.
 
 ## Known gaps
 

@@ -11,7 +11,9 @@
     "start": "node server/index.js",
     "dev": "node --use-system-ca --watch --env-file-if-exists=.env server/index.js",
     "demo": "node --use-system-ca --env-file-if-exists=.env server/index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "totp:setup": "node scripts/totp.js setup",
+    "totp:check": "node --env-file-if-exists=.env scripts/totp.js check"
   },
   "dependencies": {
     "express": "^4.21.0",

@@ -366,7 +366,7 @@ a.chip{text-decoration:none}
 }
 
 /* "Are you sure?" for plugs marked network/important: the page's own dialog (browser pop-ups may be blocked) */
-.ask{max-width:min(420px,calc(100vw - 32px));padding:0;border-radius:18px;border:1px solid var(--line2);background:var(--card-solid);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.ask{margin:auto;max-width:min(420px,calc(100vw - 32px));padding:0;overflow:visible;border-radius:18px;border:1px solid var(--line2);background:var(--card-solid);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,.6)}
 .ask-in{padding:22px 22px 18px}
 .ask::backdrop{background:rgba(3,8,20,.65);backdrop-filter:blur(3px)}
 .ask p{margin:0 0 18px;font-size:15px;line-height:1.45}

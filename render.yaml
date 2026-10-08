@@ -2,7 +2,8 @@
 # Secrets are entered in the Render dashboard (never committed).
 # IMPORTANT: Render re-applies the values in this file whenever the file changes, so anything set by hand in the dashboard
 # (e.g. HA_MODE) must ALSO be set here, or it gets reset on the next sync. Variables that are not listed here (DATABASE_URL, the
-# Neon connection string) are left alone: Render preserves variables a Blueprint does not mention.
+# Neon connection string, and TOTP_SECRET, the authenticator key) are left alone: Render preserves variables a Blueprint
+# does not mention.
 #
 # Frankfurt, because Home Assistant's Nabu Casa gateway is in Europe (a service's region cannot be changed once created).
 services:

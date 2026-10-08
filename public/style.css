@@ -16,7 +16,7 @@ nav a{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;
 nav a svg{width:21px;height:21px}
 nav a:hover{background:rgba(96,165,250,.1);color:var(--ice)}
 nav a.on{background:rgba(59,130,246,.2);color:#fff;box-shadow:inset 0 0 0 1px rgba(96,165,250,.4)}
-main{padding:26px 32px 48px;max-width:1500px;width:100%}
+main{padding:26px 32px 48px;max-width:2600px;width:100%}
 .top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 .sub{color:var(--mute);margin-top:2px}
@@ -332,8 +332,35 @@ a.chip{text-decoration:none}
   h1{font-size:21px}
 }
 
-/* Home page: pair the cards so each row is full (wide screens only) */
+/* Home page on a wide screen:
+     row 1  energy now (left)  |  biggest consumers now (right)
+     row 2  security: doorbells and the four cameras in one full-width bar
+     row 3  heating & hot water (left)  |  bindicator (right)
+   Phones and tablets stack the same cards in one column (the order they appear in the page). */
 @media(min-width:1101px){
-  .grid[data-view=overview] #activity{grid-column:span 7}
-  .grid[data-view=overview] #consumers{grid-column:span 12}
+  .grid[data-view=overview] #energy{order:1;grid-column:span 7}
+  .grid[data-view=overview] #consumers{order:2;grid-column:span 5}
+  .grid[data-view=overview] #security{order:3;grid-column:span 12}
+  .grid[data-view=overview] #heating{order:4;grid-column:span 7}
+  .grid[data-view=overview] #bins{order:5;grid-column:span 5}
+}
+/* use the whole width on big monitors, not just the middle 1500px */
+@media(min-width:1101px){
+  /* the consumers list fills the card beside the (tall) energy picture instead of leaving a gap under it */
+  .grid[data-view=overview] #consumers{display:flex;flex-direction:column}
+  .grid[data-view=overview] #consumers .cons{flex:1;display:flex;flex-direction:column;justify-content:space-around;margin:0;padding:0}
+  .grid[data-view=overview] #consumers .cons li{margin:0}
+  .grid[data-view=overview] #consumers .cons .row{font-size:14px;margin-bottom:9px}
+  .grid[data-view=overview] #consumers .cons .bar{height:12px}
+}
+
+/* Home page, wide screens: the bindicator fills the card beside the (taller) heating card, and its bins grow with the screen */
+@media(min-width:1101px){
+  .grid[data-view=overview] #bins{--binw:clamp(64px,5.2vw,118px);display:flex;flex-direction:column}
+  .grid[data-view=overview] #bins .bin-date b{font-size:clamp(28px,2.4vw,44px)}
+  .grid[data-view=overview] #bins .bin-date span{font-size:clamp(17px,1.4vw,24px)}
+  .grid[data-view=overview] #bins .bin-row{flex:1;align-content:center;align-items:flex-end;justify-content:flex-start;gap:clamp(14px,2vw,34px);margin:18px 0}
+  .grid[data-view=overview] #bins .bin{width:calc(var(--binw) + 30px);font-size:clamp(11.5px,.85vw,14px)}
+  .grid[data-view=overview] #bins .binpic{width:var(--binw);height:auto;aspect-ratio:64/84}
+  .grid[data-view=overview] #bins .bin-after{margin-top:auto}
 }

@@ -750,7 +750,7 @@ function connect() {
 
 // ---------- views (side navigation) ----------
 const VIEWS = {
-  overview: ['energy', 'today', 'heating', 'security', 'power', 'bins', 'controls', 'activity', 'consumers'],
+  overview: ['energy', 'consumers', 'security', 'heating', 'bins'],
   energy: ['energy', 'today', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],

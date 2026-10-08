@@ -90,23 +90,24 @@ document.addEventListener('click', (e) => {
   // Only plugs marked as network or important ask first. The question is the page's own dialog, not the browser's
   // confirm(), which a browser that blocks pop-ups answers "no" without showing it.
   const name = t.dataset.name || 'This device';
-  let question = null;
+  let why = null;
   if (t.dataset.toggle !== undefined && value === 'off') {
-    if (t.dataset.warn === 'network') question = `${name} powers your network or cameras. Switching it off could cut your connection, and you may not be able to switch it back on from here. Switch it off?`;
-    else if (t.dataset.warn === 'critical') question = `${name} is marked as important. Switch it off?`;
+    if (t.dataset.warn === 'network') why = 'It powers your network or cameras. Switching it off could cut the connection, and you may not be able to switch it back on from here.';
+    else if (t.dataset.warn === 'critical') why = 'It is marked as important.';
   }
-  if (question) { ask(question, [{ label: 'Switch off', value: 'yes', danger: true }]).then((a) => { if (a === 'yes') run(t, id, value); }); return; }
+  if (why) { ask(`Switch off ${name}?`, why, [{ label: 'Switch off', value: 'yes', style: 'danger' }]).then((a) => { if (a === 'yes') run(t, id, value); }); return; }
   run(t, id, value);
 });
 
 // Asks a question in the page itself (browser pop-ups may be blocked). Resolves to the chosen button's value, or null for
 // Cancel, Esc or a tap outside the box.
 let answer = null;
-function ask(question, choices) {
+function ask(title, text, choices) {
   const dlg = $('#ask');
   if (answer) answer(null); // a question still open is dropped
-  $('#ask-text').textContent = question;
-  $('#ask-btns').innerHTML = `<button type="button" class="btn" data-a="" autofocus>Cancel</button>${choices.map((c) => `<button type="button" class="btn${c.danger ? ' danger' : ''}" data-a="${esc(c.value)}">${esc(c.label)}</button>`).join('')}`;
+  $('#ask-title').textContent = title;
+  $('#ask-text').textContent = text;
+  $('#ask-btns').innerHTML = `<button type="button" class="btn cancel" data-a="">Cancel</button>${choices.map((c) => `<button type="button" class="btn${c.style ? ` ${c.style}` : ''}" data-a="${esc(c.value)}">${esc(c.label)}</button>`).join('')}`;
   return new Promise((resolve) => {
     answer = (a) => { answer = null; if (dlg.open) dlg.close(); resolve(a || null); };
     dlg.showModal();
@@ -125,8 +126,8 @@ function run(t, id, value) {
 }
 
 document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListener('click', async () => {
-  const where = await ask('Sign out of this device, or of every device signed in to Home Control?', [
-    { label: 'Everywhere', value: 'all', danger: true }, { label: 'This device', value: 'here' }]);
+  const where = await ask('Sign out', 'Sign out of this device only, or of every device signed in to Home Control?', [
+    { label: 'Everywhere', value: 'all', style: 'danger' }, { label: 'This device', value: 'here', style: 'primary' }]);
   if (!where) return;
   const res = await fetch(where === 'all' ? '/api/logout-all' : '/api/logout', { method: 'POST' }).catch(() => null);
   if (where === 'all' && (!res || !res.ok)) { toast('Could not sign out everywhere. Try again.'); return; }

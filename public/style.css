@@ -366,11 +366,23 @@ a.chip{text-decoration:none}
 }
 
 /* "Are you sure?" for plugs marked network/important: the page's own dialog (browser pop-ups may be blocked) */
-.ask{margin:auto;max-width:min(420px,calc(100vw - 32px));padding:0;overflow:visible;border-radius:18px;border:1px solid var(--line2);background:var(--card-solid);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,.6)}
-.ask-in{padding:22px 22px 18px}
-.ask::backdrop{background:rgba(3,8,20,.65);backdrop-filter:blur(3px)}
-.ask p{margin:0 0 18px;font-size:15px;line-height:1.45}
-.ask-btns{display:flex;justify-content:flex-end;gap:10px}
-.ask-btns .btn{padding:10px 18px;font-size:14px}
-.btn.danger{background:rgba(239,68,68,.18);border-color:rgba(248,113,113,.55);color:#fecaca}
-.btn.danger:hover{background:rgba(239,68,68,.35)}
+.ask{margin:auto;width:min(440px,calc(100vw - 32px));max-width:none;padding:0;overflow:visible;border-radius:20px;border:1px solid var(--line2);background:var(--card-solid);color:var(--text);box-shadow:0 24px 60px rgba(0,0,0,.6)}
+.ask::backdrop{background:rgba(3,8,20,.7);backdrop-filter:blur(4px)}
+.ask-in{padding:24px}
+.ask h3{margin:0 0 8px;font-size:18px;font-weight:600;letter-spacing:-.01em}
+.ask p{margin:0 0 22px;font-size:14px;line-height:1.5;color:var(--mute)}
+.ask-btns{display:flex;gap:10px;justify-content:flex-end}
+.ask-btns .btn{min-height:42px;padding:10px 18px;font-size:14px;font-weight:500;white-space:nowrap}
+.ask-btns .cancel{margin-right:auto;background:none;border-color:transparent;color:var(--mute)}
+.ask-btns .cancel:hover{color:var(--text);background:rgba(96,165,250,.1)}
+.btn.primary{background:var(--blue);border-color:var(--sky);color:#fff}
+.btn.primary:hover{background:#2f6fe0}
+.btn.danger{background:rgba(239,68,68,.16);border-color:rgba(248,113,113,.5);color:#fecaca}
+.btn.danger:hover{background:rgba(239,68,68,.32)}
+/* phones: one full-width button per row, the main choice first and Cancel last */
+@media(max-width:560px){
+  .ask-in{padding:22px 18px 16px}
+  .ask-btns{flex-direction:column-reverse;gap:8px}
+  .ask-btns .btn{width:100%;min-height:48px;font-size:15px}
+  .ask-btns .cancel{margin:0;order:-1}
+}

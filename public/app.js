@@ -87,21 +87,41 @@ document.addEventListener('click', (e) => {
   if (t.dataset.n !== undefined) value = Number(t.dataset.n);
   else if (t.dataset.toggle !== undefined) value = t.classList.contains('on') ? 'off' : 'on';
   else value = t.dataset.v;
+  // Only plugs marked as network or important ask first. The question is the page's own dialog, not the browser's
+  // confirm(), which a browser that blocks pop-ups answers "no" without showing it.
+  const name = t.dataset.name || 'This device';
+  let question = null;
   if (t.dataset.toggle !== undefined && value === 'off') {
-    const name = t.dataset.name || 'This device';
-    const watts = Number(t.dataset.watts) || 0;
-    let question = null;
     if (t.dataset.warn === 'network') question = `${name} powers your network or cameras. Switching it off could cut your connection, and you may not be able to switch it back on from here. Switch it off?`;
     else if (t.dataset.warn === 'critical') question = `${name} is marked as important. Switch it off?`;
-    else if (watts > 50) question = `${name} is using ${Math.round(watts)} W right now. Switch it off?`;
-    if (question && !window.confirm(question)) return;
   }
+  if (question) { ask(question).then((yes) => { if (yes) run(t, id, value); }); return; }
+  run(t, id, value);
+});
+
+// Asks a yes/no question in the page itself. Resolves true only for "Switch off"; Cancel, Esc or a tap outside is "no".
+let answer = null;
+function ask(question) {
+  const dlg = $('#ask');
+  if (answer) answer(false); // a question still open is dropped
+  $('#ask-text').textContent = question;
+  return new Promise((resolve) => {
+    answer = (yes) => { answer = null; if (dlg.open) dlg.close(); resolve(yes); };
+    dlg.showModal();
+  });
+}
+$('#ask-yes').addEventListener('click', () => answer && answer(true));
+$('#ask-no').addEventListener('click', () => answer && answer(false));
+$('#ask').addEventListener('cancel', (e) => { e.preventDefault(); if (answer) answer(false); });
+$('#ask').addEventListener('click', (e) => { if (e.target === e.currentTarget && answer) answer(false); }); // the backdrop
+
+function run(t, id, value) {
   if (t.hasAttribute('data-close')) openBoost = null;
   let msg;
   if (id === 'hotwater.boost') msg = value === 0 ? 'Hot water boost cancelled' : `Hot water boost for ${durText(value)}`;
   else if (id.startsWith('boost:')) msg = value === 0 ? 'Boost cancelled' : `Boost started for ${durText(value)}`;
   command(id, value, msg);
-});
+}
 
 document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
@@ -519,8 +539,8 @@ class CamStream {
 function buildSecurity() {
   $('#security').innerHTML = `
     <div class="hd"><h2>Security</h2><span id="sec-tag"></span></div>
-    <div class="bells" id="sec-bells"></div>
     <div class="cams" id="cams"></div>
+    <div class="bells" id="sec-bells"></div>
     <div class="sub" style="margin-top:12px;font-size:12px">Toggles are floodlights. Live video plays straight from your Home Assistant to this screen and only runs while you are looking at it. Tap a live picture for full screen.</div>`;
   $('#cams').addEventListener('click', (e) => {
     const view = e.target.closest('.view');

@@ -59,7 +59,7 @@ checking. The problem does not occur on a home network or on Render.
   Home Assistant starts a stream on first request (~10 s) and stops it about a minute after the last video request (tested: asking for playlists in the background does not keep it alive). So the app starts the streams the moment it is opened (about 2.6 s to pictures if you open Security within a minute, ~14 s from cold). **For instant cameras at any time, turn on "Preload stream" for each camera in Home Assistant** (Settings > Devices & services > Entities > the camera > cog > Advanced settings): no internet bandwidth is used, only the link between the camera and Home Assistant at home. In live mode the page's security policy allows media from
   your `HA_URL` origin only.
 - **Devices tab:** every plug and house light, each switched on its own (there is no all-on/all-off button on purpose).
-  Switching off something that is drawing more than 50 W asks first.
+  Only the plugs below ask before switching off; the question is the app's own dialog, so it still works with pop-ups blocked.
 - **Plugs that ask first:** every plug can be switched, but the freezer and "office critical" plugs (`critical`) and anything
   that powers a router, powerline or camera PoE (`network`) ask "are you sure?" before switching OFF, because that could do
   harm or cut your own way back in. Change or remove the `warn` value on a plug in `server/entities.js`.

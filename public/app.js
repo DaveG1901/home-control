@@ -603,7 +603,8 @@ function updateCamTile(t) {
 }
 
 // Streams run only while someone is actually looking: whenever the Security card is on screen (the Home page and the Security
-// tab), the page is in the foreground, and there has been some activity in the last few minutes.
+// tab) and the page is in the foreground. On the Security tab they also pause after a few minutes without activity; the Home
+// page is often left open as a wall display, so there they keep running.
 const IDLE_PAUSE_MS = 10 * 60_000;
 let pausedForIdle = false;
 let lastActivity = Date.now();
@@ -618,8 +619,13 @@ function syncStreams() {
   }
 }
 
-// A phone left open on a camera page would otherwise stream video all day. Any touch, click or key press resumes it.
+// A phone left open on the Security tab would otherwise stream video all day. Any touch, click or key press resumes it.
 function checkIdle() {
+  if (currentView === 'overview') {
+    lastActivity = Date.now(); // the Home page never pauses, and switching to Security starts a fresh 10 minutes
+    if (pausedForIdle) { pausedForIdle = false; syncStreams(); }
+    return;
+  }
   if (!pausedForIdle && Date.now() - lastActivity > IDLE_PAUSE_MS) { pausedForIdle = true; syncStreams(); }
 }
 for (const ev of ['pointerdown', 'keydown', 'touchstart', 'wheel']) {
@@ -796,6 +802,7 @@ function setView(name) {
   document.title = name === 'overview' ? 'Home Control' : `${VIEW_TITLES[name]} · Home Control`;
   window.scrollTo(0, 0);
   requestAnimationFrame(drawChart); // the chart needs a visible container to measure its width
+  if (name === 'overview') { pausedForIdle = false; lastActivity = Date.now(); } // the Home page never pauses
   syncStreams();
 }
 const viewFromHash = () => location.hash.replace(/^#\/?/, '');

@@ -90,7 +90,6 @@ test('web app: auth, command allowlist, live updates', async (t) => {
   assert.equal(state.security.cameras.length, 4);
   assert.equal(state.devices.find((d) => d.id === 'freezer').warn, 'critical');
   assert.equal(state.devices.find((d) => d.id === 'freezer').control, true);
-  assert.equal(state.security.doorbellPressAvailable, false);
   assert.ok(state.today.selfSufficiency !== null);
 
   const cmd = (id, value, extra = {}) => fetch(`${base}/api/command`, { method: 'POST', headers: { ...H, ...extra }, body: JSON.stringify({ id, value }) });

@@ -165,8 +165,7 @@ class Store extends EventEmitter {
     };
 
     const security = {
-      // The Tapo D230 doorbells expose only battery + detection switches in HA - no press event yet.
-      doorbellPressAvailable: false,
+      // The Tapo D230 doorbells expose only battery + detection switches in HA (no press event), so that is all we show.
       doorbells: E.doorbells.map((d) => ({
         id: d.id, name: d.name, battery: round(n(d.battery), 0), motion: this.isOn(d.motion), person: this.isOn(d.person),
       })),

@@ -544,7 +544,7 @@ class CamStream {
 
 function buildSecurity() {
   $('#security').innerHTML = `
-    <div class="hd"><h2>Security</h2><span id="sec-tag"></span></div>
+    <div class="hd"><h2>Security</h2></div>
     <div class="cams" id="cams"></div>
     <div class="bells" id="sec-bells"></div>
     <div class="sub" style="margin-top:12px;font-size:12px">Toggles are floodlights. Live video plays straight from your Home Assistant to this screen and only runs while you are looking at it. Tap a live picture for full screen.</div>`;
@@ -647,7 +647,6 @@ function renderSecurity(m) {
   const bellDetect = (d) => (d.motion && d.person ? 'Motion & person detection on' : d.motion ? 'Motion detection on' : d.person ? 'Person detection on' : 'Detection off');
   const status = (c) => (c.status === 'clear' ? 'Clear' : `${c.status[0].toUpperCase()}${c.status.slice(1)} detected`);
 
-  setHTML($('#sec-tag'), s.doorbellPressAvailable ? '' : '<span class="tag warn">Doorbell press alerts: not available yet</span>');
   setHTML($('#sec-bells'), s.doorbells.map((d) => `
       <div class="bell"><div class="ico">${icon('bell')}</div><div><b>${esc(d.name)}</b><small>${bellDetect(d)}</small></div><div class="batt">${d.battery === null ? dash : `${d.battery}%`}<br><small style="color:var(--mute)">battery</small></div></div>`).join(''));
 

@@ -99,6 +99,6 @@ minutes without traffic, which closes the link to Home Assistant and misses even
 ## Known gaps
 
 - **Doorbell press alerts:** the Tapo D230 only exposes battery and detection switches in HA (no press event, no camera
-  entity), so the dashboard shows them as "not available yet".
+  entity), so the dashboard shows battery and motion/person detection only.
 - Live camera video is intentionally not streamed through the cloud app.
 - History has gaps whenever the app/HA link is down.

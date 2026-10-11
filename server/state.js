@@ -112,6 +112,16 @@ class Store extends EventEmitter {
   attr(id, name) { const e = this.entities.get(id); const v = e && e.attributes ? e.attributes[name] : undefined; return v === undefined ? null : v; }
 
   // ---- view model sent to the browser ----
+  /** What a camera-only (viewer) session receives: the camera names for the live pictures and the connection status. Nothing else. */
+  viewerModel() {
+    return {
+      role: 'viewer',
+      connection: { mode: this.mode, ha: this.haConnected, ready: this.ready, error: this.fatal },
+      security: { cameras: E.cameras.map((c) => ({ id: c.id, name: c.name })) },
+    };
+  }
+
+  /** Everything, for the owner. */
   viewModel() {
     const n = (id) => this.num(id);
     const en = E.energy;
@@ -196,6 +206,7 @@ class Store extends EventEmitter {
 
     const w = this.str(E.environment.weather);
     return {
+      role: 'owner',
       ts: Date.now(),
       connection: { mode: this.mode, ha: this.haConnected, ready: this.ready, error: this.fatal },
       environment: { outsideTemp: round(n(E.environment.outsideTemp), 1), weather: w ? WEATHER[w] || w : null },

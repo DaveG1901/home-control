@@ -386,3 +386,10 @@ a.chip{text-decoration:none}
   .ask-btns .btn{width:100%;min-height:48px;font-size:15px}
   .ask-btns .cancel{margin:0;order:-1}
 }
+
+/* Camera-only sign-in: no navigation, the cameras card across the whole width, sign out at the top right on every screen size */
+body[data-role=viewer] nav{display:none}
+body[data-role=viewer] .app{grid-template-columns:1fr}
+body[data-role=viewer] .signout-m{display:grid;place-items:center;width:36px;height:36px;padding:0;border-radius:50%;background:none;border:1px solid var(--line);color:var(--mute);cursor:pointer}
+body[data-role=viewer] main{padding-bottom:32px}
+.grid[data-view=cameras] #security{grid-column:span 12}

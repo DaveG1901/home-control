@@ -201,3 +201,98 @@ test('failed Home Assistant calls do not pass its error text to the browser', as
   assert.equal(res.status, 502);
   assert.doesNotMatch(JSON.stringify(await res.json()), /KeyError|usr/);
 });
+
+// ---------- camera-only (viewer) sign-in ----------
+
+const codeNow = (secret) => codeAt(base32Decode(secret), Math.floor(Date.now() / 30_000));
+const cookieOf = (res) => res.headers.get('set-cookie').split(';')[0];
+
+test('viewer sign-in stays off until both VIEWER_PASSWORD and VIEWER_TOTP_SECRET are set (and never breaks the owner)', async (t) => {
+  const warn = console.warn; console.warn = () => {}; t.after(() => { console.warn = warn; });
+  const app = await start({ ...BASE, viewerPassword: 'camera-pass-1', viewerTotpSecret: '' });
+  t.after(() => app.close());
+  const url = `http://127.0.0.1:${app.port}/api/login`;
+  assert.equal((await post(url, { password: 'camera-pass-1', code: '123456' })).status, 401);
+  assert.deepEqual(await (await fetch(`http://127.0.0.1:${app.port}/api/login-options`)).json(), { code: false });
+  assert.equal((await post(url, { password: 'correct-horse' })).status, 200, 'owner unaffected');
+});
+
+test('viewer: needs its own password AND a code from its own key; the owner key and password do not mix', async (t) => {
+  const ownerKey = newSecret();
+  const viewerKey = newSecret();
+  const app = await start({ ...BASE, totpSecret: ownerKey, viewerPassword: 'camera-pass-1', viewerTotpSecret: viewerKey });
+  t.after(() => app.close());
+  const url = `http://127.0.0.1:${app.port}/api/login`;
+  const warn = console.warn; console.warn = () => {}; t.after(() => { console.warn = warn; });
+  assert.equal((await post(url, { password: 'camera-pass-1' })).status, 401, 'no code');
+  assert.equal((await post(url, { password: 'camera-pass-1', code: codeNow(ownerKey) })).status, 401, "owner's code");
+  assert.equal((await post(url, { password: 'correct-horse', code: codeNow(viewerKey) })).status, 401, "viewer's code for the owner");
+  const ok = await post(url, { password: 'camera-pass-1', code: codeNow(viewerKey) });
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).role, 'viewer');
+});
+
+test('viewer: sees camera names only, cannot command or read anything else, and is told so in the page', async (t) => {
+  const viewerKey = newSecret();
+  const app = await start({ ...BASE, viewerPassword: 'camera-pass-1', viewerTotpSecret: viewerKey });
+  t.after(() => app.close());
+  const base = `http://127.0.0.1:${app.port}`;
+  while (!app.store.ready) await new Promise((r) => setTimeout(r, 25));
+  // owner still signs in without a code (no TOTP_SECRET), although the page now shows the code box
+  assert.deepEqual(await (await fetch(`${base}/api/login-options`)).json(), { code: true });
+  const owner = cookieOf(await post(`${base}/api/login`, { password: 'correct-horse' }));
+  const viewer = cookieOf(await post(`${base}/api/login`, { password: 'camera-pass-1', code: codeNow(viewerKey) }));
+  const V = { Cookie: viewer };
+
+  const st = await (await fetch(`${base}/api/state`, { headers: V })).json();
+  assert.deepEqual(Object.keys(st).sort(), ['connection', 'role', 'security']);
+  assert.deepEqual(Object.keys(st.security), ['cameras']);
+  assert.equal(st.security.cameras.length, 4);
+  for (const c of st.security.cameras) assert.deepEqual(Object.keys(c).sort(), ['id', 'name']);
+  assert.equal((await (await fetch(`${base}/api/state`, { headers: { Cookie: owner } })).json()).role, 'owner');
+
+  // refused
+  assert.equal((await post(`${base}/api/command`, { id: 'floodlight:garage', value: 'on' }, V)).status, 403);
+  assert.equal((await post(`${base}/api/command`, { id: 'plug:dishwasher', value: 'off' }, V)).status, 403);
+  assert.equal(app.store.raw('switch.dishwasher').state, 'on', 'nothing changed');
+  for (const p of ['/api/history', '/api/health']) assert.equal((await fetch(`${base}${p}`, { headers: V })).status, 403, p);
+  assert.equal((await post(`${base}/api/logout-all`, {}, V)).status, 403);
+  // allowed
+  assert.deepEqual(await (await fetch(`${base}/api/camera/garage/stream`, { headers: V })).json(), { demo: true });
+  assert.equal((await post(`${base}/api/cameras/warm`, {}, V)).status, 200);
+  assert.match(await (await fetch(`${base}/`, { headers: V })).text(), /<body data-role="viewer"/);
+  assert.doesNotMatch(await (await fetch(`${base}/`, { headers: { Cookie: owner } })).text(), /data-role="viewer"/);
+
+  // live updates: the viewer only ever receives the camera-only state, even when the owner changes something
+  const ws = new WebSocket(`ws://127.0.0.1:${app.port}/live`, { headers: V });
+  const got = [];
+  ws.on('message', (m) => got.push(JSON.parse(m).data));
+  await new Promise((r) => ws.once('message', r));
+  assert.equal((await post(`${base}/api/command`, { id: 'plug:dishwasher', value: 'off' }, { Cookie: owner })).status, 200);
+  await new Promise((r) => setTimeout(r, 600));
+  ws.close();
+  assert.ok(got.length >= 2, 'received the update');
+  for (const d of got) assert.deepEqual(Object.keys(d).sort(), ['connection', 'role', 'security']);
+});
+
+test('viewer: a new VIEWER_PASSWORD signs out every viewer but no owner; the owner can sign everyone out', async (t) => {
+  const viewerKey = newSecret();
+  const cfg = { ...BASE, viewerPassword: 'camera-pass-1', viewerTotpSecret: viewerKey };
+  const first = await start(cfg);
+  const base1 = `http://127.0.0.1:${first.port}`;
+  const owner = cookieOf(await post(`${base1}/api/login`, { password: 'correct-horse' }));
+  const viewer = cookieOf(await post(`${base1}/api/login`, { password: 'camera-pass-1', code: codeNow(viewerKey) }));
+  await first.close();
+
+  const second = await start({ ...cfg, viewerPassword: 'camera-pass-2' }); // restarted with a new viewer password
+  t.after(() => second.close());
+  const base = `http://127.0.0.1:${second.port}`;
+  assert.equal((await fetch(`${base}/api/state`, { headers: { Cookie: viewer } })).status, 401, 'old viewer session ended');
+  assert.equal((await fetch(`${base}/api/state`, { headers: { Cookie: owner } })).status, 200, 'owner still signed in');
+
+  const v2 = cookieOf(await post(`${base}/api/login`, { password: 'camera-pass-2', code: codeNow(viewerKey) }));
+  assert.equal((await fetch(`${base}/api/state`, { headers: { Cookie: v2 } })).status, 200);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal((await post(`${base}/api/logout-all`, {}, { Cookie: owner })).status, 200);
+  assert.equal((await fetch(`${base}/api/state`, { headers: { Cookie: v2 } })).status, 401, 'sign out everywhere includes viewers');
+});

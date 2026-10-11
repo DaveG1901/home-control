@@ -77,6 +77,12 @@ checking. The problem does not occur on a home network or on Render.
   `npm run totp:setup`, add the key to the app, `npm run totp:check <code>`, then add `TOTP_SECRET` in Render). A code
   works once. Wrong attempts: 5 from one address = 15 minute lock; 30 from anywhere in an hour = all sign-ins pause.
   Failed attempts are logged with the address.
+- **Camera-only sign-in (optional):** set `VIEWER_PASSWORD` (8+ characters, not the same as `APP_PASSWORD`) and
+  `VIEWER_TOTP_SECRET` (`npm run totp:setup viewer`; its own key, never yours). Anyone signing in with them sees the four live
+  camera pictures and nothing else: no navigation, doorbells, detections, floodlights, energy, heating, devices or history.
+  The server enforces it: such a session receives only camera names and is refused every other API (403). It stays off
+  until both are set. Changing `VIEWER_PASSWORD` signs out every camera viewer and nobody else; "Sign out everywhere"
+  signs out viewers too.
 - **Sessions:** signed HttpOnly SameSite=Strict Secure cookie. Ends after 7 days unused, and 30 days after signing in
   whatever happens. Sign out offers "This device" or "Everywhere"; "Everywhere" ends every session (remembered in the
   database, so a restart does not undo it) and closes their live connections. Changing `SESSION_SECRET` does the same.

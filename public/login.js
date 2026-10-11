@@ -7,7 +7,8 @@ const codeRow = document.getElementById('code-row');
 const code = document.getElementById('code');
 
 // Ask for the authenticator code only when the server wants one.
-fetch('/api/login-options').then((r) => r.json()).then((o) => { codeRow.hidden = !o.code; code.required = !!o.code; }).catch(() => {});
+// Not marked required: with a camera-only sign-in set up, the owner may have no code of their own. The server decides.
+fetch('/api/login-options').then((r) => r.json()).then((o) => { codeRow.hidden = !o.code; }).catch(() => {});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();

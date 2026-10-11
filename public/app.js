@@ -10,6 +10,9 @@ const icon = (id) => `<svg><use href="#i-${id}"/></svg>`;
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 const setHTML = (el, html) => { if (el._h !== html) { el.innerHTML = html; el._h = html; } };
 
+// A camera-only (viewer) sign-in gets the cameras and nothing else. The server marks the page and only ever sends it
+// camera names; this flag just lays the page out to match.
+const VIEWER = document.body.dataset.role === 'viewer';
 let model = null;
 let wsOpen = false;
 let history = [];
@@ -126,8 +129,10 @@ function run(t, id, value) {
 }
 
 document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListener('click', async () => {
-  const where = await ask('Sign out', 'Sign out of this device only, or of every device signed in to Home Control?', [
-    { label: 'Everywhere', value: 'all', style: 'danger' }, { label: 'This device', value: 'here', style: 'primary' }]);
+  const where = VIEWER
+    ? await ask('Sign out', 'Sign out of Home Control on this device?', [{ label: 'Sign out', value: 'here', style: 'primary' }])
+    : await ask('Sign out', 'Sign out of this device only, or of every device signed in to Home Control?', [
+      { label: 'Everywhere', value: 'all', style: 'danger' }, { label: 'This device', value: 'here', style: 'primary' }]);
   if (!where) return;
   const res = await fetch(where === 'all' ? '/api/logout-all' : '/api/logout', { method: 'POST' }).catch(() => null);
   if (where === 'all' && (!res || !res.ok)) { toast('Could not sign out everywhere. Try again.'); return; }
@@ -137,12 +142,12 @@ document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListene
 // ---------- header ----------
 function renderHeader(m) {
   const hr = new Date().getHours();
-  $('#greeting').textContent = `Good ${hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening'}, Dave`;
+  $('#greeting').textContent = `Good ${hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening'}${VIEWER ? '' : ', Dave'}`;
   $('#subtitle').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const chips = [];
   if (m.connection.mode === 'demo') chips.push('<div class="chip demo">Demo mode · sample data</div>');
-  if (m.environment.outsideTemp !== null) {
+  if (m.environment && m.environment.outsideTemp !== null) {
     chips.push(`<div class="chip">${fx(m.environment.outsideTemp, 1)}°C${m.environment.weather ? ` · ${esc(m.environment.weather)}` : ''}</div>`);
   }
   // Next bin day, on every page. Links to the full Bindicator card on the Overview.
@@ -544,10 +549,10 @@ class CamStream {
 
 function buildSecurity() {
   $('#security').innerHTML = `
-    <div class="hd"><h2>Security</h2></div>
+    <div class="hd"><h2>${VIEWER ? 'Cameras' : 'Security'}</h2></div>
     <div class="cams" id="cams"></div>
-    <div class="bells" id="sec-bells"></div>
-    <div class="sub" style="margin-top:12px;font-size:12px">Toggles are floodlights. Live video plays straight from your Home Assistant to this screen and only runs while you are looking at it. Tap a live picture for full screen.</div>`;
+    ${VIEWER ? '' : '<div class="bells" id="sec-bells"></div>'}
+    <div class="sub" style="margin-top:12px;font-size:12px">${VIEWER ? '' : 'Toggles are floodlights. '}Live video plays straight from Home Assistant to this screen and only runs while you are looking at it. Tap a live picture for full screen.</div>`;
   $('#cams').addEventListener('click', (e) => {
     const view = e.target.closest('.view');
     if (!view) return;
@@ -644,6 +649,7 @@ window.addEventListener('pagehide', () => { for (const t of camTiles.values()) t
 function renderSecurity(m) {
   const s = m.security;
   ensureCamTiles(s.cameras);
+  if (VIEWER) { for (const t of camTiles.values()) updateCamTile(t); return; } // pictures only: no detections, doorbells or floodlights
   const bellDetect = (d) => (d.motion && d.person ? 'Motion & person detection on' : d.motion ? 'Motion detection on' : d.person ? 'Person detection on' : 'Detection off');
   const status = (c) => (c.status === 'clear' ? 'Clear' : `${c.status[0].toUpperCase()}${c.status.slice(1)} detected`);
 
@@ -745,7 +751,9 @@ function drawChart() {
 // ---------- render ----------
 function renderAll() {
   const m = model;
+  if ((m.role === 'viewer') !== VIEWER) { location.reload(); return; }
   renderHeader(m);
+  if (VIEWER) { renderSecurity(m); return; }
   updateEnergy(m.energy);
   renderToday(m);
   renderSurplus(m);
@@ -787,11 +795,13 @@ const VIEWS = {
   security: ['security', 'activity'],
   devices: ['plugs', 'lights'],
   reports: ['power', 'today'],
+  cameras: ['security'], // the only view a camera-only sign-in has
 };
-const VIEW_TITLES = { overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', devices: 'Devices', reports: 'Reports' };
+const VIEW_TITLES = { cameras: 'Cameras', overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', devices: 'Devices', reports: 'Reports' };
 
 function setView(name) {
-  if (!Object.prototype.hasOwnProperty.call(VIEWS, name)) name = 'overview';
+  if (VIEWER) name = 'cameras';
+  else if (name === 'cameras' || !Object.prototype.hasOwnProperty.call(VIEWS, name)) name = 'overview';
   const show = VIEWS[name];
   document.querySelector('.grid').dataset.view = name;
   currentView = name;
@@ -813,6 +823,5 @@ buildSecurity();
 buildPower();
 setView(viewFromHash());
 connect();
-loadHistory();
-setInterval(loadHistory, 60_000);
+if (!VIEWER) { loadHistory(); setInterval(loadHistory, 60_000); }
 let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawChart, 150); });

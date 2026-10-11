@@ -1,6 +1,9 @@
 'use strict';
 
-// Sign-in: the app password, plus a six-digit code from an authenticator app when TOTP_SECRET is set.
+// Sign-in: the app password, plus a six-digit code from an authenticator app when TOTP_SECRET is set. That is the owner.
+// A second, camera-only "viewer" sign-in exists when VIEWER_PASSWORD and VIEWER_TOTP_SECRET are both set: the shared viewer
+// password plus a code from its own authenticator key. Viewer sessions are signed with a key that includes the viewer
+// password, so changing VIEWER_PASSWORD ends every viewer session and no owner session.
 // A session is a signed, HttpOnly cookie. It ends after 7 days without use, and 30 days after signing in whatever happens.
 // "Sign out everywhere" ends every session that exists (the time it was used is kept in the database so it survives restarts).
 
@@ -30,46 +33,76 @@ function parseCookies(header) {
   return out;
 }
 
-function createAuth({ password, secret, secure, totpSecret = '', loadValidAfter = async () => 0, saveValidAfter = async () => {}, now = () => Date.now() }) {
+/** Why the viewer sign-in is off (or '' when it is on). It is never an error: the owner's sign-in is unaffected. */
+function viewerProblem({ password, viewerPassword, viewerTotpSecret }) {
+  if (!viewerPassword && !viewerTotpSecret) return 'not set up';
+  if (!password) return 'the owner password (APP_PASSWORD) is not set';
+  if (viewerPassword.length < 8) return 'VIEWER_PASSWORD must be at least 8 characters';
+  if (viewerPassword === password) return 'VIEWER_PASSWORD must differ from APP_PASSWORD';
+  if (!viewerTotpSecret) return 'VIEWER_TOTP_SECRET is not set (npm run totp:setup viewer)';
+  try { createTotp(viewerTotpSecret); } catch (err) { return `VIEWER_TOTP_SECRET: ${err.message}`; }
+  return '';
+}
+
+function createAuth({
+  password, secret, secure, totpSecret = '', viewerPassword = '', viewerTotpSecret = '',
+  loadValidAfter = async () => 0, saveValidAfter = async () => {}, now = () => Date.now(),
+}) {
   const enabled = !!password;
   const key = secret || crypto.randomBytes(32).toString('hex'); // random per process if unset (dev)
-  const sign = (p) => crypto.createHmac('sha256', key).update(p).digest('base64url');
+  const hmac = (k, p) => crypto.createHmac('sha256', k).update(p).digest('base64url');
   const totp = totpSecret ? createTotp(totpSecret, now) : null;
+  const viewerOff = viewerProblem({ password, viewerPassword, viewerTotpSecret });
+  const viewer = viewerOff ? null : {
+    totp: createTotp(viewerTotpSecret, now),
+    key: `${key}|viewer|${sha(viewerPassword).toString('hex')}`, // a new viewer password = a new key = old viewer cookies refused
+  };
+  if (viewerOff && viewerOff !== 'not set up') console.warn(`[auth] camera-only sign-in is off: ${viewerOff}`);
+  const codeRequired = !!totp || !!viewer; // the sign-in page shows the code box (the owner may leave it empty without TOTP_SECRET)
   const fails = new Map(); // address -> { count, until }
   let recentFails = [];    // times of wrong attempts from anywhere, for the global limit
   let validAfter = 0;      // sessions started at or before this time are no longer accepted
 
-  const makeToken = (loginAt, expires) => { const p = `${loginAt}.${expires}`; return `${p}.${sign(p)}`; };
+  // owner: "<loginAt>.<expires>.<sig>"   viewer: "v.<loginAt>.<expires>.<sig>"
+  function makeToken(role, loginAt, expires) {
+    const p = `${loginAt}.${expires}`;
+    return role === 'viewer' ? `v.${p}.${hmac(viewer.key, `v.${p}`)}` : `${p}.${hmac(key, p)}`;
+  }
 
-  /** The session in a cookie value, or null. */
+  /** The session in a cookie value ({ role, loginAt, expires }), or null. */
   function readToken(t) {
     if (typeof t !== 'string') return null;
     const parts = t.split('.');
-    if (parts.length !== 3) return null;
+    let role; let signed; let k;
+    if (parts.length === 3) { role = 'owner'; signed = `${parts[0]}.${parts[1]}`; k = key; }
+    else if (parts.length === 4 && parts[0] === 'v' && viewer) { role = 'viewer'; parts.shift(); signed = `v.${parts[0]}.${parts[1]}`; k = viewer.key; }
+    else return null;
     const [loginAt, expires, sig] = parts;
     const a = Buffer.from(sig);
-    const b = Buffer.from(sign(`${loginAt}.${expires}`));
+    const b = Buffer.from(hmac(k, signed));
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-    const s = { loginAt: Number(loginAt), expires: Number(expires) };
+    const s = { role, loginAt: Number(loginAt), expires: Number(expires) };
     if (!(s.expires > now()) || !(s.loginAt > validAfter) || now() - s.loginAt > MAX_MS) return null;
     return s;
   }
 
   const session = (req) => readToken(parseCookies(req.headers.cookie)[COOKIE]);
   const isAuthed = (req) => !enabled || !!session(req);
+  /** 'owner', 'viewer' or null (not signed in). Without a password (local development only) everyone is the owner. */
+  const role = (req) => (!enabled ? 'owner' : (session(req) || {}).role || null);
 
   function cookie(value, maxAgeSec) {
     return `${COOKIE}=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAgeSec}${secure ? '; Secure' : ''}`;
   }
-  function issue(res, loginAt) {
+  function issue(res, who, loginAt) {
     const expires = Math.min(now() + IDLE_MS, loginAt + MAX_MS);
-    res.setHeader('Set-Cookie', cookie(makeToken(loginAt, expires), Math.max(1, Math.round((expires - now()) / 1000))));
+    res.setHeader('Set-Cookie', cookie(makeToken(who, loginAt, expires), Math.max(1, Math.round((expires - now()) / 1000))));
   }
 
   /** Middleware: extends a session that is in use (at most once a day), up to 30 days from signing in. */
   function renew(req, res, next) {
     const s = enabled && session(req);
-    if (s && s.expires - now() < IDLE_MS - RENEW_AFTER_MS && s.expires < s.loginAt + MAX_MS) issue(res, s.loginAt);
+    if (s && s.expires - now() < IDLE_MS - RENEW_AFTER_MS && s.expires < s.loginAt + MAX_MS) issue(res, s.role, s.loginAt);
     next();
   }
 
@@ -96,15 +129,20 @@ function createAuth({ password, secret, secure, totpSecret = '', loadValidAfter 
 
     const body = req.body || {};
     const given = typeof body.password === 'string' ? body.password : '';
-    const pwOk = enabled && crypto.timingSafeEqual(sha(given), sha(password));
-    const codeOk = !totp || (pwOk && totp.verify(typeof body.code === 'string' ? body.code : ''));
-    if (!pwOk || !codeOk) {
-      failed(ip, rec, pwOk ? 'code' : 'password', req.headers['x-forwarded-for']);
-      return res.status(401).json({ error: totp ? 'Incorrect password or code' : 'Incorrect password' });
+    const code = typeof body.code === 'string' ? body.code : '';
+    // Both passwords are always compared, so the time taken does not reveal which one was nearly right.
+    const isOwner = enabled && crypto.timingSafeEqual(sha(given), sha(password));
+    const isViewer = !!viewer && crypto.timingSafeEqual(sha(given), sha(viewerPassword));
+    const who = isOwner ? 'owner' : isViewer ? 'viewer' : null;
+    const codeOk = who === 'owner' ? (!totp || totp.verify(code)) : who === 'viewer' ? viewer.totp.verify(code) : false;
+    if (!who || !codeOk) {
+      failed(ip, rec, who ? `${who} code` : 'password', req.headers['x-forwarded-for']);
+      return res.status(401).json({ error: codeRequired ? 'Incorrect password or code' : 'Incorrect password' });
     }
     fails.delete(ip);
-    issue(res, t);
-    return res.json({ ok: true });
+    if (who === 'viewer') console.log(`[auth] camera-only sign-in from ${ip}`);
+    issue(res, who, t);
+    return res.json({ ok: true, role: who });
   }
 
   function logout(req, res) {
@@ -131,10 +169,10 @@ function createAuth({ password, secret, secure, totpSecret = '', loadValidAfter 
   pruner.unref();
 
   return {
-    enabled, codeRequired: !!totp, isAuthed, session, renew, login, logout, signOutEverywhere, init,
+    enabled, codeRequired, viewerEnabled: !!viewer, isAuthed, session, role, renew, login, logout, signOutEverywhere, init,
     stop: () => clearInterval(pruner),
     _fails: fails,
   };
 }
 
-module.exports = { createAuth, parseCookies, IDLE_MS, MAX_MS };
+module.exports = { createAuth, parseCookies, viewerProblem, IDLE_MS, MAX_MS };

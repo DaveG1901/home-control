@@ -10,6 +10,9 @@ const config = {
   appPassword: env.APP_PASSWORD || '',
   sessionSecret: env.SESSION_SECRET || '',
   totpSecret: (env.TOTP_SECRET || '').trim(), // authenticator-app codes at sign-in (npm run totp:setup)
+  // Optional camera-only sign-in (both needed; it stays off otherwise): a shared password and its own authenticator key.
+  viewerPassword: env.VIEWER_PASSWORD || '',
+  viewerTotpSecret: (env.VIEWER_TOTP_SECRET || '').trim(),
   databaseUrl: env.DATABASE_URL || '',
   production: env.NODE_ENV === 'production',
 };

@@ -1,5 +1,6 @@
 'use strict';
 
+const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const express = require('express');
@@ -80,6 +81,7 @@ async function start(config = defaultConfig) {
   // "Sign out everywhere" is remembered in the database (when there is one) so a restart does not undo it.
   const auth = createAuth({
     password: config.appPassword, secret: config.sessionSecret, secure: config.production, totpSecret: config.totpSecret,
+    viewerPassword: config.viewerPassword || '', viewerTotpSecret: config.viewerTotpSecret || '',
     loadValidAfter: () => settings.loadValidAfter(history.pool),
     saveValidAfter: (ms) => settings.saveValidAfter(history.pool, ms),
   });
@@ -126,6 +128,15 @@ async function start(config = defaultConfig) {
   });
   app.use(auth.renew);
 
+  // A camera-only (viewer) session may load the page and its files, read its own cut-down state, and fetch camera streams.
+  // Every other API (commands, history, health, sign out everywhere) is refused, whatever the page does.
+  const VIEWER_API = [/^\/api\/state$/, /^\/api\/camera\/[^/]+\/stream$/, /^\/api\/cameras\/warm$/, /^\/api\/logout$/];
+  app.use((req, res, next) => {
+    if (auth.role(req) !== 'viewer') return next();
+    if (req.path.startsWith('/api/') && !VIEWER_API.some((r) => r.test(req.path))) return res.status(403).json({ error: 'Not available' });
+    return next();
+  });
+
   app.get('/api/health', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status(), cameraWarmup: warmer.status() }));
 
   // Ends every session on every device, then closes their live connections.
@@ -139,7 +150,8 @@ async function start(config = defaultConfig) {
     return auth.logout(req, res);
   });
 
-  app.get('/api/state', (req, res) => res.json(store.viewModel()));
+  const modelFor = (role) => (role === 'viewer' ? store.viewerModel() : store.viewModel());
+  app.get('/api/state', (req, res) => res.json(modelFor(auth.role(req))));
 
   // The page calls this when it comes back to the foreground, so the camera streams are started ahead of a visit to Security.
   app.post('/api/cameras/warm', (req, res) => {
@@ -198,7 +210,12 @@ async function start(config = defaultConfig) {
     }
   });
 
-  app.get('/', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+  // The page is told its role up front, so a camera-only visitor never sees the full layout flash up first.
+  app.get('/', (req, res) => {
+    if (auth.role(req) !== 'viewer') return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+    const html = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8').replace('<body', '<body data-role="viewer"');
+    return res.type('html').send(html);
+  });
   app.use(express.static(PUBLIC_DIR, { index: false }));
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -226,11 +243,12 @@ async function start(config = defaultConfig) {
   });
   wss.on('connection', (ws, req) => {
     ws.cookie = req.headers.cookie; // re-checked by the heartbeat: the connection ends when the session does
+    ws.role = auth.role(req);       // a camera-only connection only ever receives the camera-only state
     ws.on('error', (err) => console.warn('[live] connection closed:', err.message)); // e.g. an oversized message; never fatal
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     if (config.mode === 'live') warmer.kick(); // start the streams the moment the app opens
-    ws.send(JSON.stringify({ type: 'state', data: store.viewModel() }));
+    ws.send(JSON.stringify({ type: 'state', data: modelFor(ws.role) }));
   });
 
   let pending = null;
@@ -239,8 +257,12 @@ async function start(config = defaultConfig) {
     pending = setTimeout(() => {
       pending = null;
       if (!wss.clients.size) return;
-      const msg = JSON.stringify({ type: 'state', data: store.viewModel() });
-      for (const c of wss.clients) if (c.readyState === 1) c.send(msg);
+      const msgs = {}; // built once per role, only if someone with that role is connected
+      for (const c of wss.clients) {
+        if (c.readyState !== 1) continue;
+        msgs[c.role] = msgs[c.role] || JSON.stringify({ type: 'state', data: modelFor(c.role) });
+        c.send(msgs[c.role]);
+      }
     }, 250);
   });
   const heartbeat = setInterval(() => {

@@ -92,7 +92,8 @@ const NOMINAL_WATTS = { garage_heater: 2000, dishwasher: 1200, tumble_dryer: 220
 
 async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0, animate = true } = {}) {
   const states = seed();
-  const subscribers = new Map(); // ws -> subscription id
+  const subscribers = new Map(); // ws -> subscription id (subscribe_events: every change)
+  const entitySubs = new Map(); // ws -> { id, ids } (subscribe_entities: only the listed entities, compact format)
   const wss = new WebSocketServer({ host, port, path: '/api/websocket' });
   await new Promise((resolve) => wss.once('listening', resolve));
   const timers = new Set();
@@ -108,6 +109,11 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
     for (const [ws, subId] of subscribers) {
       if (ws.readyState !== 1) continue;
       ws.send(JSON.stringify({ id: subId, type: 'event', event: { event_type: 'state_changed', data: { entity_id: entityId, old_state: old && withMeta(old), new_state: withMeta(next) }, time_fired: now() } }));
+    }
+    for (const [ws, sub] of entitySubs) {
+      if (ws.readyState !== 1 || !sub.ids.has(entityId)) continue;
+      const t = Date.now() / 1000;
+      ws.send(JSON.stringify({ id: sub.id, type: 'event', event: { c: { [entityId]: { '+': { s: next.state, a: next.attributes, lc: t } } } } }));
     }
   }
 
@@ -174,13 +180,23 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
           if (!states[m.entity_id]) fail('not_found', 'Entity not found'); else ok({ url: '/api/hls/faketoken/master_playlist.m3u8' });
           break;
         case 'subscribe_events': subscribers.set(ws, m.id); ok(); break;
+        case 'subscribe_entities': {
+          const ids = new Set(m.entity_ids || []);
+          entitySubs.set(ws, { id: m.id, ids });
+          ok();
+          const t = Date.now() / 1000;
+          const a = {};
+          for (const id of ids) if (states[id]) a[id] = { s: states[id].state, a: states[id].attributes, c: 'fake', lc: t };
+          ws.send(JSON.stringify({ id: m.id, type: 'event', event: { a } }));
+          break;
+        }
         case 'call_service':
           try { callService(m.domain, m.service, m.service_data || {}); ok({ context: { id: 'fake' } }); } catch (e) { fail(e.code || 'unknown', e.message); }
           break;
         default: fail('unknown_command', `Unknown command ${m.type}`);
       }
     });
-    ws.on('close', () => subscribers.delete(ws));
+    ws.on('close', () => { subscribers.delete(ws); entitySubs.delete(ws); });
   });
 
   // Make the numbers move so the dashboard feels alive.

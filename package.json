@@ -8,7 +8,7 @@
     "node": ">=22.15"
   },
   "scripts": {
-    "start": "node server/index.js",
+    "start": "node --max-old-space-size=320 server/index.js",
     "dev": "node --use-system-ca --watch --env-file-if-exists=.env server/index.js",
     "demo": "node --use-system-ca --env-file-if-exists=.env server/index.js",
     "test": "node --test",

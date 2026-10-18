@@ -189,3 +189,34 @@ test('camera streams: authenticated, allowlisted, demo flag, and live addresses 
   const dCsp = (await fetch(`${dBase}/login`)).headers.get('content-security-policy');
   assert.ok(!dCsp.includes('http://127.0.0.1:' + fake.port), 'demo mode does not whitelist any Home Assistant origin');
 });
+
+test('HA client: subscribes to only the listed entities, then receives just their changes', async () => {
+  const fake = await createFakeHa({ token: 't', animate: false });
+  const ha = new HAClient({ url: fake.url, token: 't', entities: ['switch.dishwasher', 'sensor.dishwasher_current_consumption'] });
+  const gotStates = once(ha, 'states');
+  ha.start();
+  const states = await gotStates;
+  assert.deepEqual(states.map((s) => s.entity_id).sort(), ['sensor.dishwasher_current_consumption', 'switch.dishwasher']);
+  assert.equal(states.find((s) => s.entity_id === 'switch.dishwasher').state, 'on');
+  const seen = [];
+  ha.on('state_changed', (id, s) => seen.push([id, s && s.state]));
+  await ha.callService('switch', 'turn_off', { entity_id: 'switch.dishwasher' });
+  await until(() => seen.some(([id, st]) => id === 'switch.dishwasher' && st === 'off'));
+  await ha.callService('switch', 'turn_off', { entity_id: 'switch.washing_machine' }); // not subscribed
+  await wait(150);
+  assert.ok(!seen.some(([id]) => id === 'switch.washing_machine'), 'other entities are never sent');
+  ha.stop();
+  await fake.close();
+});
+
+test('HA client: the compact subscription format (add, change, remove attributes, remove entity)', () => {
+  const { applyCompressed } = require('../server/ha');
+  const cache = new Map();
+  applyCompressed(cache, { a: { 'light.x': { s: 'off', a: { brightness: 0, name: 'X' }, lc: 1 } } });
+  assert.equal(cache.get('light.x').state, 'off');
+  const [[id, s]] = applyCompressed(cache, { c: { 'light.x': { '+': { s: 'on', a: { brightness: 200 }, lc: 2 }, '-': { a: ['name'] } } } });
+  assert.equal(id, 'light.x');
+  assert.deepEqual([s.state, s.attributes], ['on', { brightness: 200 }]);
+  assert.deepEqual(applyCompressed(cache, { r: ['light.x'] }), [['light.x', null]]);
+  assert.equal(cache.size, 0);
+});

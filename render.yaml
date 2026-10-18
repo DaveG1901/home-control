@@ -13,7 +13,7 @@ services:
     runtime: node
     plan: starter
     buildCommand: npm install --omit=dev
-    startCommand: node server/index.js
+    startCommand: node --max-old-space-size=320 server/index.js   # keep Node well inside the plan's 512 MB
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION

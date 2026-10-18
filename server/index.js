@@ -12,7 +12,7 @@ const { Store } = require('./state');
 const { History } = require('./history');
 const { createAuth } = require('./auth');
 const settings = require('./settings');
-const { buildCommands, cameras } = require('./entities');
+const { buildCommands, cameras, watchedEntities } = require('./entities');
 const { createFakeHa } = require('./fakeHa');
 const { BinService, demoEvents } = require('./bins');
 const { CameraWarmer } = require('./warm');
@@ -55,9 +55,9 @@ async function start(config = defaultConfig) {
   let ha;
   if (config.mode === 'demo') {
     fake = await createFakeHa({ token: 'demo-token' });
-    ha = new HAClient({ url: fake.url, token: 'demo-token' });
+    ha = new HAClient({ url: fake.url, token: 'demo-token', entities: [...watchedEntities()] });
   } else {
-    ha = new HAClient({ url: config.haUrl, token: config.haToken });
+    ha = new HAClient({ url: config.haUrl, token: config.haToken, entities: [...watchedEntities()] }); // only what the app uses
   }
   ha.on('log', (m) => console.log('[ha]', m));
   ha.on('connected', () => { console.log('[ha] connected'); store.setHaConnected(true); });
@@ -147,7 +147,7 @@ async function start(config = defaultConfig) {
     return next();
   });
 
-  app.get('/api/health', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), history: history.status(), cameraWarmup: warmer.status() }));
+  app.get('/api/health', (req, res) => res.json({ ok: true, ha: store.haConnected, mode: config.mode, commit, uptimeSeconds: Math.round(process.uptime()), memory: memory(), history: history.status(), cameraWarmup: warmer.status() }));
 
   // Ends every session on every device, then closes their live connections.
   app.post('/api/logout-all', async (req, res) => {
@@ -290,9 +290,15 @@ async function start(config = defaultConfig) {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     if (config.mode === 'live') warmer.kick(); // start the streams the moment the app opens
-    ws.send(JSON.stringify({ type: 'state', data: modelFor(ws.role) }));
+    ws.lastSent = JSON.stringify({ type: 'state', data: modelFor(ws.role) });
+    ws.send(ws.lastSent);
   });
 
+  // Live updates: at most one a second, only when something actually changed, and never piling up for a connection that
+  // cannot keep up (a phone with a poor signal): that one is skipped, and closed if it falls far behind (the page reconnects).
+  const BROADCAST_MS = 1000;
+  const SLOW_BYTES = 256 * 1024;
+  const STUCK_BYTES = 2 * 1024 * 1024;
   let pending = null;
   store.on('change', () => {
     if (pending) return;
@@ -303,10 +309,19 @@ async function start(config = defaultConfig) {
       for (const c of wss.clients) {
         if (c.readyState !== 1) continue;
         msgs[c.role] = msgs[c.role] || JSON.stringify({ type: 'state', data: modelFor(c.role) });
+        if (c.lastSent === msgs[c.role]) continue; // nothing new for this connection
+        if (c.bufferedAmount > STUCK_BYTES) { c.terminate(); continue; }
+        if (c.bufferedAmount > SLOW_BYTES) continue;
+        c.lastSent = msgs[c.role];
         c.send(msgs[c.role]);
       }
-    }, 250);
+    }, BROADCAST_MS);
   });
+
+  // Memory, in the log every 30 minutes and in /api/health, so any growth shows up long before Render restarts the service.
+  const memory = () => { const m = process.memoryUsage(); const mb = (n) => Math.round(n / 1048576); return { rssMb: mb(m.rss), heapMb: mb(m.heapUsed), connections: wss.clients.size }; };
+  const memLog = setInterval(() => { const m = memory(); console.log(`[memory] rss ${m.rssMb} MB, heap ${m.heapMb} MB, ${m.connections} live connection(s)`); }, 30 * 60_000);
+  memLog.unref();
   const heartbeat = setInterval(() => {
     for (const c of wss.clients) {
       if (!auth.isAuthed({ headers: { cookie: c.cookie } })) { c.close(4001, 'Signed out'); continue; }

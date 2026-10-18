@@ -18,12 +18,46 @@ function toWsUrl(base) {
   return u.toString();
 }
 
+const INITIAL_TIMEOUT_MS = 20_000;
+
+/**
+ * Applies one subscribe_entities message (Home Assistant's compact format: "a" = added/full, "c" = changed, "r" = removed)
+ * to the cache, and returns [entityId, newStateOrNull] for every entity it touched.
+ */
+function applyCompressed(cache, ev) {
+  const out = [];
+  const full = (id, v) => ({ entity_id: id, state: v.s, attributes: v.a || {}, last_changed: v.lc, last_updated: v.lu || v.lc });
+  for (const [id, v] of Object.entries(ev.a || {})) { const s = full(id, v); cache.set(id, s); out.push([id, s]); }
+  for (const [id, d] of Object.entries(ev.c || {})) {
+    const cur = cache.get(id) || { entity_id: id, state: '', attributes: {} };
+    const next = { ...cur, attributes: { ...cur.attributes } };
+    const plus = d['+'] || {};
+    if ('s' in plus) next.state = plus.s;
+    if (plus.a) Object.assign(next.attributes, plus.a);
+    if (plus.lc) { next.last_changed = plus.lc; next.last_updated = plus.lc; }
+    if (plus.lu) next.last_updated = plus.lu;
+    for (const k of (d['-'] && d['-'].a) || []) delete next.attributes[k];
+    cache.set(id, next);
+    out.push([id, next]);
+  }
+  for (const id of ev.r || []) { cache.delete(id); out.push([id, null]); }
+  return out;
+}
+
 class HAClient extends EventEmitter {
-  constructor({ url, token }) {
+  /**
+   * entities: the entity ids the app uses. When given, only those are subscribed to (subscribe_entities), instead of every
+   * state change in Home Assistant (a busy house sends several times more than the app needs).
+   */
+  constructor({ url, token, entities = null }) {
     super();
     this.url = toWsUrl(url);
     this.baseUrl = String(url).replace(/\/+$/, ''); // for the few things only the REST API offers
     this.token = token;
+    this.entities = entities && entities.length ? [...entities] : null;
+    this.cache = new Map();   // subscribe_entities: the latest full state of each subscribed entity
+    this.entSubId = null;     // id of the subscribe_entities subscription on the current connection
+    this.initialTimer = null;
     this.ws = null;
     this.nextId = 1;
     this.pending = new Map(); // id -> { resolve, reject, timer }
@@ -89,7 +123,14 @@ class HAClient extends EventEmitter {
         break;
       }
       case 'event':
-        if (msg.event && msg.event.event_type === 'state_changed') {
+        if (this.entSubId !== null && msg.id === this.entSubId && msg.event) {
+          const touched = applyCompressed(this.cache, msg.event);
+          if (!this.connected) {
+            // the first message after subscribing is the full current state of every subscribed entity
+            clearTimeout(this.initialTimer);
+            this._becameConnected([...this.cache.values()]);
+          } else for (const [id, s] of touched) this.emit('state_changed', id, s);
+        } else if (msg.event && msg.event.event_type === 'state_changed') {
           const d = msg.event.data;
           this.emit('state_changed', d.entity_id, d.new_state);
         }
@@ -101,23 +142,38 @@ class HAClient extends EventEmitter {
 
   async _onAuthed() {
     try {
-      // Subscribe first so nothing is missed between the snapshot and the subscription.
+      if (this.entities) {
+        // Only the entities the app uses: Home Assistant sends their full state once, then just what changes.
+        this.cache = new Map();
+        this.entSubId = this.nextId; // the id _send is about to use; events for this subscription carry it
+        const ws = this.ws;
+        this.initialTimer = setTimeout(() => { if (!this.connected && this.ws === ws) { this.emit('log', 'no initial states received'); try { ws.terminate(); } catch { /* ignore */ } } }, INITIAL_TIMEOUT_MS);
+        await this._send({ type: 'subscribe_entities', entity_ids: this.entities });
+        return; // connected once the initial states arrive (see 'event')
+      }
+      // Everything: subscribe first so nothing is missed between the snapshot and the subscription.
       await this._send({ type: 'subscribe_events', event_type: 'state_changed' });
       const states = await this._send({ type: 'get_states' });
-      this.connected = true;
-      this.backoff = 1000;
-      this._startPing();
-      this.emit('connected');
-      this.emit('states', states);
+      this._becameConnected(states);
     } catch (err) {
       this.emit('log', `startup failed: ${err.message}`);
       try { this.ws.close(); } catch { /* ignore */ }
     }
   }
 
+  _becameConnected(states) {
+    this.connected = true;
+    this.backoff = 1000;
+    this._startPing();
+    this.emit('connected');
+    this.emit('states', states);
+  }
+
   _onClose() {
     const wasConnected = this.connected;
     this.connected = false;
+    this.entSubId = null;
+    clearTimeout(this.initialTimer);
     this._clearTimers();
     for (const [, p] of this.pending) { clearTimeout(p.timer); p.reject(new Error('Disconnected from Home Assistant')); }
     this.pending.clear();
@@ -182,4 +238,4 @@ class HAClient extends EventEmitter {
   }
 }
 
-module.exports = { HAClient, toWsUrl };
+module.exports = { HAClient, toWsUrl, applyCompressed };

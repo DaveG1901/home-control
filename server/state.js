@@ -222,7 +222,6 @@ class Store extends EventEmitter {
     const w = this.str(E.environment.weather);
     return {
       role: 'owner',
-      ts: Date.now(),
       connection: { mode: this.mode, ha: this.haConnected, ready: this.ready, error: this.fatal },
       environment: { outsideTemp: round(n(E.environment.outsideTemp), 1), weather: w ? WEATHER[w] || w : null },
       energy, today, heating, security, devices, consumers, catalogue,

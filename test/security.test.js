@@ -269,9 +269,9 @@ test('viewer: sees camera names only, cannot command or read anything else, and 
   ws.on('message', (m) => got.push(JSON.parse(m).data));
   await new Promise((r) => ws.once('message', r));
   assert.equal((await post(`${base}/api/command`, { id: 'plug:dishwasher', value: 'off' }, { Cookie: owner })).status, 200);
-  await new Promise((r) => setTimeout(r, 600));
+  await new Promise((r) => setTimeout(r, 1400)); // updates go out at most once a second
   ws.close();
-  assert.ok(got.length >= 2, 'received the update');
+  assert.equal(got.length, 1, 'nothing a viewer can see changed, so nothing more was sent');
   for (const d of got) assert.deepEqual(Object.keys(d).sort(), ['connection', 'role', 'security']);
 });
 

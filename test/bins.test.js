@@ -107,4 +107,6 @@ test('demo mode makes alternating weeks that the service understands', async () 
   assert.equal(v.next.weekday, 'Monday');
   assert.notDeepEqual(ids(v.next), ids(v.then[0]), 'consecutive weeks differ');
   assert.ok(ids(v.next).includes('food') && ids(v.then[0]).includes('food'));
+  assert.ok(v.later.length > v.then.length && v.later.length <= 8, 'the Bins page gets up to 8 upcoming collections');
+  assert.deepEqual(v.later.slice(0, 2), v.then, 'starting with the same ones as the short list');
 });

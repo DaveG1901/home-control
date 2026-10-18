@@ -102,6 +102,17 @@ Hosting: this runs on Render's Starter plan (always on, about $7/month). On the 
 minutes without traffic, which closes the link to Home Assistant and misses events. `/api/health` (signed in) reports
 `uptimeSeconds`: if it keeps growing between visits the service is not sleeping.
 
+## Pages and navigation
+
+Home is a summary: the energy picture, the top 3 consumers, a heating summary (with main-thermostat boost), the four
+cameras and a row of tiles (next bins, rain, best time for appliances, outside, northern lights, floods), each opening its
+page. Pages: Home, Energy, Heating, Security, Plugs, Lights, Outside, Bins, Reports (`VIEWS` in `public/app.js`;
+`#/devices` still works and opens Plugs).
+
+- **Computers:** a sidebar of icons; the ☰ at the top widens it to show page names (remembered per device).
+- **Phones:** a bottom bar with Home, Energy, Heating, Security and **More**, which slides a menu in from the left with
+  every page.
+
 ## Light and dark theme
 
 A switch in the header cycles **Automatic** (the default: follows the device's own light/dark setting, live) → **Light** →

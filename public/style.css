@@ -344,7 +344,7 @@ a.chip{text-decoration:none}
   .grid[data-view=overview] #consumers{order:2;grid-column:span 5}
   .grid[data-view=overview] #security{order:3;grid-column:span 12}
   .grid[data-view=overview] #heating{order:4;grid-column:span 7}
-  .grid[data-view=overview] #bins{order:5;grid-column:span 5}
+
 }
 /* use the whole width on big monitors, not just the middle 1500px */
 @media(min-width:1101px){
@@ -358,13 +358,13 @@ a.chip{text-decoration:none}
 
 /* Home page, wide screens: the bindicator fills the card beside the (taller) heating card, and its bins grow with the screen */
 @media(min-width:1101px){
-  .grid[data-view=overview] #bins{--binw:clamp(64px,5.2vw,118px);display:flex;flex-direction:column}
-  .grid[data-view=overview] #bins .bin-date b{font-size:clamp(28px,2.4vw,44px)}
-  .grid[data-view=overview] #bins .bin-date span{font-size:clamp(17px,1.4vw,24px)}
-  .grid[data-view=overview] #bins .bin-row{flex:1;align-content:center;align-items:flex-end;justify-content:flex-start;gap:clamp(14px,2vw,34px);margin:18px 0}
-  .grid[data-view=overview] #bins .bin{width:calc(var(--binw) + 30px);font-size:clamp(11.5px,.85vw,14px)}
-  .grid[data-view=overview] #bins .binpic{width:var(--binw);height:auto;aspect-ratio:64/84}
-  .grid[data-view=overview] #bins .bin-after{margin-top:auto}
+  .grid[data-view=bins] #bins{--binw:clamp(64px,5.2vw,118px);display:flex;flex-direction:column}
+  .grid[data-view=bins] #bins .bin-date b{font-size:clamp(28px,2.4vw,44px)}
+  .grid[data-view=bins] #bins .bin-date span{font-size:clamp(17px,1.4vw,24px)}
+  .grid[data-view=bins] #bins .bin-row{flex:1;align-content:center;align-items:flex-end;justify-content:flex-start;gap:clamp(14px,2vw,34px);margin:18px 0}
+  .grid[data-view=bins] #bins .bin{width:calc(var(--binw) + 30px);font-size:clamp(11.5px,.85vw,14px)}
+  .grid[data-view=bins] #bins .binpic{width:var(--binw);height:auto;aspect-ratio:64/84}
+  .grid[data-view=bins] #bins .bin-after{margin-top:auto}
 }
 
 /* "Are you sure?" for plugs marked network/important: the page's own dialog (browser pop-ups may be blocked) */
@@ -563,3 +563,95 @@ html[data-theme=light] .stage.wx-fog .sky .fog{background:linear-gradient(to top
   html[data-theme=light] .stage .housewrap img.house{filter:drop-shadow(0 12px 18px rgba(37,99,235,.22))}
   html[data-theme=light] .stage.night .housewrap img.house{filter:brightness(.42) saturate(.7)}
 }
+
+/* ---------- navigation: sidebar on computers (icons, or icons and names), bottom bar + "More" drawer on phones ---------- */
+.navtoggle,.more{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;color:var(--mute);background:none;border:0;cursor:pointer;transition:.2s;font:inherit}
+.navtoggle svg,.more svg{width:21px;height:21px}
+.navtoggle:hover,.more:hover{background:rgba(96,165,250,.1);color:var(--ice)}
+.navtoggle{margin-bottom:14px}
+.more{display:none}
+nav button.link{display:flex;align-items:center;gap:10px}
+nav button.link svg{width:18px;height:18px;flex:none}
+nav button.link .lbl{display:none}
+@media(min-width:701px){
+  body.nav-wide .app{grid-template-columns:216px minmax(0,1fr)}
+  body.nav-wide nav{align-items:stretch;padding:18px 12px}
+  body.nav-wide nav a,body.nav-wide .navtoggle{width:auto;display:flex;align-items:center;justify-content:flex-start;gap:14px;padding:0 13px}
+  body.nav-wide nav a .lbl,body.nav-wide nav button.link .lbl{display:inline;font-size:14px;font-weight:500}
+  body.nav-wide nav button.link{padding:10px 13px;font-size:13px}
+  nav{transition:padding .2s}
+}
+@media(max-width:700px){
+  nav a:not(.pri),nav .navtoggle,nav #logout{display:none}
+  nav .more{display:flex;flex:1;width:auto;height:54px;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:12px}
+  nav .more .lbl{display:block;font-size:10px;line-height:1;letter-spacing:.02em}
+  nav .more.on,nav .more[aria-expanded=true]{background:rgba(59,130,246,.2);color:var(--text)}
+  /* the drawer: the same menu slides in from the left with every page */
+  .drawer-back{position:fixed;inset:0;background:rgba(3,8,20,.55);backdrop-filter:blur(2px);z-index:35}
+  body.drawer-open nav{top:0;bottom:0;left:0;right:auto;width:min(280px,84vw);height:auto;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:4px;
+    padding:16px 12px calc(16px + env(safe-area-inset-bottom));border-top:0;border-right:1px solid var(--line2);background:var(--card-solid);z-index:40;
+    box-shadow:12px 0 40px rgba(0,0,0,.35);animation:drawer .2s ease-out}
+  body.drawer-open nav a,body.drawer-open nav a:not(.pri){display:flex;flex:none;flex-direction:row;justify-content:flex-start;align-items:center;gap:14px;height:48px;padding:0 14px}
+  body.drawer-open nav a .lbl{font-size:15px;letter-spacing:0}
+  body.drawer-open nav .more{display:none}
+  body.drawer-open nav .navtoggle{display:flex;width:auto;justify-content:flex-start;padding:0 14px;margin-bottom:8px}
+  body.drawer-open nav .nav-spacer{flex:1}
+}
+@keyframes drawer{from{transform:translateX(-100%)}to{transform:none}}
+
+/* ---------- Home: heating summary and the row of tiles ---------- */
+.hs-main{display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.22),var(--panel));border:1px solid var(--line2)}
+.hs-main .t{font-size:40px;font-weight:600;letter-spacing:-.04em;line-height:1}
+.hs-main .t sup{font-size:17px;color:var(--sky);font-weight:500}
+.hs-main b{display:block;font-size:14px;font-weight:600}
+.hs-main small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.hs-btns{margin-top:12px}
+html[data-theme=light] .hs-main{background:linear-gradient(135deg,rgba(37,99,235,.1),var(--panel))}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px}
+.tile{display:flex;flex-direction:column;gap:4px;padding:13px 15px;border-radius:15px;background:var(--panel);border:1px solid var(--line);color:var(--text);text-decoration:none;min-width:0;transition:.15s}
+.tile:hover{border-color:var(--line2);transform:translateY(-1px)}
+.tile .tl{display:flex;align-items:center;gap:8px;color:var(--mute);font-size:12px}
+.tile .tl svg{width:16px;height:16px;flex:none}
+.tile b{font-size:19px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile small{color:var(--mute);font-size:12px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile small .cdot{width:9px;height:9px;border-radius:50%;display:inline-block;vertical-align:-1px}
+.tile.warn{border-color:rgba(242,184,75,.5)}.tile.warn b{color:var(--amber)}
+.tile.wet{border-color:rgba(56,189,248,.45)}.tile.wet b{color:#38bdf8}
+.tile.good{border-color:rgba(52,211,153,.55)}.tile.good b{color:#34d399}
+html[data-theme=light] .tile.wet b{color:#0369a1}
+html[data-theme=light] .tile.good b{color:#047857}
+
+/* Home page layout on wide screens:
+     energy picture (left, two rows tall) | biggest consumers (top 3), then heating summary
+     cameras across the full width
+     tiles across the full width */
+@media(min-width:1101px){
+  .grid[data-view=overview] #energy{order:1;grid-column:span 7;grid-row:span 2}
+  .grid[data-view=overview] #consumers{order:2;grid-column:span 5}
+  .grid[data-view=overview] #heatsum{order:3;grid-column:span 5}
+  .grid[data-view=overview] #security{order:4;grid-column:span 12}
+  .grid[data-view=overview] #tiles{order:5;grid-column:span 12}
+}
+.grid[data-view=overview] #consumers .cons li:nth-child(n+4){display:none}
+.grid[data-view=overview] #security .bells,.grid[data-view=overview] #security>.sub{display:none}
+
+/* ---------- Outside and Bins pages ---------- */
+.grid[data-view=outside] #outdoors{grid-column:span 12}
+.grid[data-view=outside] .radar{height:440px}
+@media(max-width:700px){.grid[data-view=outside] .radar{height:300px}}
+@media(min-width:1101px){
+  .grid[data-view=bins] #bins{grid-column:span 5}
+  .grid[data-view=bins] #binlist{grid-column:span 7}
+}
+.bl-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 2px;border-top:1px solid var(--line)}
+.bl-row:first-of-type{border-top:0}
+.bl-row b{font-size:15px;font-weight:600}
+.bl-row span{color:var(--ice)}
+.bl-row small{display:block;color:var(--dim);font-size:11.5px;margin-top:1px}
+.bl-bins{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.bl-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line2);background:var(--panel)}
+.bl-chip i{width:10px;height:10px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
+.bl-chip.extra{color:var(--mute)}
+.grid[data-view=bins] #bins .bin-after{display:none}
+.bl-row>div:first-child{flex:none;min-width:0}
+.bl-row>div:first-child b,.bl-row>div:first-child span{white-space:nowrap}

@@ -115,6 +115,7 @@ class BinService {
       stale: !!this.error,
       next,
       then: upcoming.slice(1, 3).map((d) => decorate(d, today)),
+      later: upcoming.slice(1, 9).map((d) => decorate(d, today)), // the Bins page: about the next two months
       putOutTonight: !!next && next.daysAway === 1 && hour >= PUT_OUT_FROM_HOUR,
     };
   }

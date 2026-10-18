@@ -930,6 +930,62 @@ function renderBestTime(m) {
     ${vs}`);
 }
 
+// ---------- Home: heating summary ----------
+function renderHeatSummary(m) {
+  const h = m.heating;
+  const main = h.main;
+  const off = main.mode === 'unavailable';
+  const mode = opt('heating.mode', main.mode);
+  const target = opt('heating.target', main.target);
+  const boosting = opt('boost:main', main.boost ? 1 : 0) > 0;
+  const modeText = { off: 'Off', auto: 'Schedule', heat: 'Heat' }[mode] || mode;
+  const zonesBoosting = h.zones.filter((z) => opt(`boost:${z.id}`, z.boost ? 1 : 0) > 0).length;
+  const hw = h.hotWater;
+  const hwBoost = opt('hotwater.boost', hw.boosting ? 1 : 0) > 0;
+  const btns = boosting
+    ? '<button class="btn on" data-cmd="boost:main" data-n="0">Cancel boost</button>'
+    : h.boost.minutes.map((v) => `<button class="btn" data-cmd="boost:main" data-n="${v}"${off ? ' disabled' : ''}>${v === h.boost.minutes[0] ? 'Boost ' : ''}${durText(v)}</button>`).join('');
+  setHTML($('#heatsum'), `
+    <div class="hd"><h2>Heating</h2><a class="tag" href="#/heating">All rooms →</a></div>
+    <div class="hs-main">
+      <div class="t">${fx(main.current, 1)}<sup>°C</sup></div>
+      <div><b>${esc(modeText)}${target !== null ? ` · target ${fx(target, 1)}°` : ''}</b>
+        <small>${boosting ? `Boost on: heating to ${h.boost.temperature}°` : 'Main thermostat'}${zonesBoosting ? ` · ${zonesBoosting} room${zonesBoosting > 1 ? 's' : ''} boosting` : ''}</small>
+        <small>Hot water: ${hwBoost ? 'boost on' : hw.heatingNow ? 'heating now' : 'not heating'}</small></div>
+    </div>
+    <div class="bbtns hs-btns">${btns}</div>`);
+}
+
+// ---------- Home: a row of small tiles, each opening its page ----------
+function renderTiles(m) {
+  const o = m.outdoors;
+  const tiles = [];
+  const tile = (href, iconId, label, value, note, cls = '') => tiles.push(`<a class="tile ${cls}" href="${href}"><div class="tl">${icon(iconId)}<span>${esc(label)}</span></div><b>${value}</b><small>${note}</small></a>`);
+  const b = m.bins;
+  if (b && b.available && b.next) {
+    const n = b.next;
+    const dots = n.bins.map((k) => `<i class="cdot" style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('');
+    tile('#/bins', 'trash', 'Next bins', esc(n.when), `${dots} ${esc(n.bins.map((k) => k.label).join(', ') || n.summary)}`, b.putOutTonight || n.daysAway === 0 ? 'warn' : '');
+  }
+  if (o && o.rain && o.rain.known) tile('#/outside', 'cloud', 'Rain', o.rain.raining ? 'Raining' : o.rain.startsInMin !== null ? `In ${o.rain.startsInMin} min` : 'Dry', esc(o.rain.text), o.rain.raining || o.rain.startsInMin !== null ? 'wet' : '');
+  if (o && o.bestTime && o.bestTime.best) {
+    const bt = o.bestTime.best;
+    tile('#/energy', 'bolt', 'Best time for appliances', `${clock(bt.from)}–${clock(bt.to)}`, esc(bt.reason));
+  }
+  if (o && o.weather) tile('#/outside', 'cloud', 'Outside', `${fx(o.weather.temp, 0)}°C`, esc(o.weather.text));
+  if (o && o.aurora) tile('#/outside', 'cloud', 'Northern lights', o.aurora.worthLooking ? 'Look north!' : esc(o.aurora.status[0].toUpperCase() + o.aurora.status.slice(1)), esc(o.aurora.text), o.aurora.worthLooking ? 'good' : '');
+  if (o && o.floods) tile('#/outside', 'drop', 'Floods', o.floods.warnings.length ? esc(o.floods.warnings[0].severity) : 'None', o.floods.warnings.length ? esc(o.floods.warnings[0].area) : `No warnings within ${o.floods.radiusKm} km`, o.floods.warnings.length ? 'warn' : '');
+  setHTML($('#tiles'), `<div class="tiles">${tiles.join('')}</div>`);
+}
+
+// ---------- Bins page: the next couple of months ----------
+function renderBinList(m) {
+  const b = m.bins;
+  const later = (b && b.later) || [];
+  const rows = later.map((d) => `<div class="bl-row"><div><b>${esc(d.weekday)}</b> <span>${esc(d.dayMonth)}</span><small>${esc(d.when)}</small></div><div class="bl-bins">${d.bins.map((k) => `<span class="bl-chip"><i style="background:${esc(k.color)}"></i>${esc(k.label)}</span>`).join('')}${(d.extras || []).map((x) => `<span class="bl-chip extra">${esc(x)}</span>`).join('')}</div></div>`).join('');
+  setHTML($('#binlist'), `<div class="hd"><h2>Coming up</h2><span class="tag">Next ${later.length} collections</span></div>${rows || '<div class="empty">No later collections found in the council calendar.</div>'}`);
+}
+
 // ---------- render ----------
 function renderAll() {
   const m = model;
@@ -940,6 +996,9 @@ function renderAll() {
   updateScene(m);
   renderOutdoors(m);
   renderBestTime(m);
+  renderHeatSummary(m);
+  renderTiles(m);
+  renderBinList(m);
   renderToday(m);
   renderSurplus(m);
   renderBins(m);
@@ -973,26 +1032,34 @@ function connect() {
 
 
 // ---------- views (side navigation) ----------
+// Home is a summary: small versions of the main cards plus a row of tiles, each opening its own page.
 const VIEWS = {
-  overview: ['energy', 'consumers', 'security', 'heating', 'bins', 'outdoors', 'besttime'],
+  overview: ['energy', 'consumers', 'heatsum', 'security', 'tiles'],
   energy: ['energy', 'today', 'besttime', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],
-  devices: ['plugs', 'lights'],
+  plugs: ['plugs'],
+  lights: ['lights'],
+  outside: ['outdoors'],
+  bins: ['bins', 'binlist'],
   reports: ['power', 'today'],
   cameras: ['security'], // the only view a camera-only sign-in has
 };
-const VIEW_TITLES = { cameras: 'Cameras', overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', devices: 'Devices', reports: 'Reports' };
+const VIEW_TITLES = { cameras: 'Cameras', overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', plugs: 'Plugs', lights: 'Lights', outside: 'Outside', bins: 'Bins', reports: 'Reports' };
+const OLD_VIEWS = { devices: 'plugs' }; // old bookmarks
 
 function setView(name) {
   if (VIEWER) name = 'cameras';
+  else if (OLD_VIEWS[name]) name = OLD_VIEWS[name];
   else if (name === 'cameras' || !Object.prototype.hasOwnProperty.call(VIEWS, name)) name = 'overview';
+  closeDrawer();
   const show = VIEWS[name];
   document.querySelector('.grid').dataset.view = name;
   currentView = name;
   for (const t of camTiles.values()) t.manual = false;
   document.querySelectorAll('.grid > .card').forEach((c) => { c.hidden = !!show && !show.includes(c.id); });
   document.querySelectorAll('nav a[data-view]').forEach((a) => a.classList.toggle('on', a.dataset.view === name));
+  $('#more').classList.toggle('on', !document.querySelector(`nav a.pri[data-view="${name}"]`)); // on phones, "More" lights up for the pages it holds
   document.title = name === 'overview' ? 'Home Control' : `${VIEW_TITLES[name]} · Home Control`;
   window.scrollTo(0, 0);
   requestAnimationFrame(drawChart); // the chart needs a visible container to measure its width
@@ -1000,6 +1067,37 @@ function setView(name) {
   syncStreams();
 }
 const viewFromHash = () => location.hash.replace(/^#\/?/, '');
+
+// ---------- navigation: a sidebar that opens wide on computers, a bottom bar plus a "More" drawer on phones ----------
+const narrow = window.matchMedia('(max-width:700px)');
+function setWide(wide) {
+  document.body.classList.toggle('nav-wide', wide);
+  const t = $('#navtoggle');
+  t.title = wide ? 'Hide page names' : 'Show page names';
+  t.setAttribute('aria-label', t.title);
+  t.setAttribute('aria-expanded', String(wide));
+}
+function openDrawer() {
+  document.body.classList.add('drawer-open');
+  $('#drawer-back').hidden = false;
+  $('#more').setAttribute('aria-expanded', 'true');
+}
+function closeDrawer() {
+  document.body.classList.remove('drawer-open');
+  $('#drawer-back').hidden = true;
+  $('#more').setAttribute('aria-expanded', 'false');
+}
+$('#navtoggle').addEventListener('click', () => {
+  if (narrow.matches) { closeDrawer(); return; } // inside the phone drawer, the same button closes it
+  const wide = !document.body.classList.contains('nav-wide');
+  setWide(wide);
+  try { localStorage.setItem('hc-nav', wide ? 'wide' : 'narrow'); } catch { /* private mode */ }
+});
+$('#more').addEventListener('click', () => (document.body.classList.contains('drawer-open') ? closeDrawer() : openDrawer()));
+$('#drawer-back').addEventListener('click', closeDrawer);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+narrow.addEventListener('change', closeDrawer);
+setWide((() => { try { return localStorage.getItem('hc-nav') === 'wide'; } catch { return false; } })());
 window.addEventListener('hashchange', () => setView(viewFromHash()));
 
 buildEnergy();

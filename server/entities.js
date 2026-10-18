@@ -105,6 +105,8 @@ const plugs = [
   plug('Living areas', 'tv', 'TV plug', 'tv_plug', 'tv_plug_current_consumption'),
   plug('Living areas', 'downstairs_hall', 'Downstairs hall plug', 'downstairs_hall_plug', 'downstairs_hall_plug_power'),
   plug('Living areas', 'upstairs_hall', 'Upstairs hall plug', 'upstairs_hall_plug', 'upstairs_hall_plug_power_2'),
+  plug('Living areas', 'dryer', 'Dryer plug', 'dryer_plug', 'dryer_plug_current_consumption'),
+  plug('Living areas', 'bim_downstairs', 'Bim downstairs', 'bim_downstairs', 'bim_downstairs_current_consumption'),
 
   plug('Bedrooms', 'dave_tv', 'Dave TV plug', 'dave_tv_plug', 'dave_tv_plug_current_consumption'),
   plug('Bedrooms', 'eleanor_bedside', 'Eleanor bedside plug', 'eleanor_bedside_plug', 'eleanor_bedside_plug_current_consumption'),

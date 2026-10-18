@@ -118,7 +118,7 @@ SN7 postcode district, `area` in `server/entities.js`) is sent, never the addres
 
 - **Best time:** each half hour gets a score: 65% the solar forecast (radiation x panel size), 35% how clean the grid is.
   The best 2-hour window starting 07:00-21:00 is suggested.
-- **Panel size:** set `solar.kwp` in `server/entities.js`; until then the inverter's 6.6 kW limit is used.
+- **Panel size:** 8.8 kWp (`solar.kwp` in `server/entities.js`).
 - **The house picture:** the sun (or moon) moves along an arc from sunrise to sunset; night darkens the house and lights
   the windows whose lights or lamps are on (`houseWindows` in `server/entities.js` says which window is which room); the
   45 minutes around sunrise and sunset glow; cloud, rain, snow, fog and storms are drawn from the current weather.

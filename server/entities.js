@@ -289,17 +289,17 @@ function watchedEntities() {
 // carbon-intensity and flood services.
 const area = { name: 'Faringdon', postcode: 'SN7', lat: 51.66, lon: -1.59, floodRadiusKm: 15 };
 
-// The panels' rated size in kWp (from the installation paperwork). Until it is set, the inverter's 6.6 kW limit is used.
-const solar = { kwp: null };
+// The panels' rated size in kWp (from the installation paperwork). If unset, the inverter's 6.6 kW limit is used.
+const solar = { kwp: 8.8 };
 
 // Which lights and plugs make each window of the house picture glow at night. Window ids are fixed positions on house.png.
 const houseWindows = {
-  groundLeft: { lights: ['living_bulb_1', 'living_bulb_2', 'living_bulb_3'], plugs: ['lamp_plug', 'living_big_lamp', 'living_extension', 'tv'] },
-  groundHall: { lights: ['downstairs_hall', 'lobby'], plugs: ['downstairs_hall'] },
-  groundRight: { lights: ['office_light', 'office_bulb'], plugs: [] },
-  upLeft: { lights: ['kasper_light', 'kasper_bulb'], plugs: [] },
-  upMiddle: { lights: ['upstairs_hall'], plugs: ['upstairs_hall'] },
-  upRight: { lights: ['dave_light', 'dave_bulb'], plugs: [] },
+  groundLeft: { lights: ['office_light', 'office_bulb'], plugs: [] },                     // office
+  groundHall: { lights: ['downstairs_hall', 'lobby'], plugs: ['downstairs_hall'] },          // hall and front door
+  groundRight: { lights: ['living_bulb_1', 'living_bulb_2', 'living_bulb_3'], plugs: ['lamp_plug', 'living_big_lamp', 'living_extension', 'tv'] }, // living room
+  upLeft: { lights: ['eleanor_light'], plugs: [] },                                         // Eleanor
+  upMiddle: { lights: ['upstairs_hall'], plugs: ['upstairs_hall'] },                         // upstairs hall
+  upRight: { lights: ['michelle_light'], plugs: [] },                                       // Michelle
 };
 
 module.exports = { area, solar, houseWindows, energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, bins, quickControls, surplusDevices, buildCommands, watchedEntities };

@@ -166,7 +166,10 @@ function renderHeader(m) {
 
   const chips = [];
   if (m.connection.mode === 'demo') chips.push('<div class="chip demo">Demo mode · sample data</div>');
-  if (m.environment && m.environment.outsideTemp !== null) {
+  // Weather: the same source as the Outside card, tiles and house picture; Home Assistant's Met Office sensor if that is unavailable
+  const ow = m.outdoors && m.outdoors.weather;
+  if (ow) chips.push(`<a class="chip" href="#/outside" title="Weather for ${esc(m.outdoors.area)}">${fx(ow.temp, 0)}°C · ${esc(ow.text)}</a>`);
+  else if (m.environment && m.environment.outsideTemp !== null) {
     chips.push(`<div class="chip">${fx(m.environment.outsideTemp, 1)}°C${m.environment.weather ? ` · ${esc(m.environment.weather)}` : ''}</div>`);
   }
   // Next bin day, on every page. Links to the full Bindicator card on the Overview.

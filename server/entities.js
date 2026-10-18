@@ -293,12 +293,13 @@ const area = { name: 'Uffington', postcode: 'SN7', lat: 51.598, lon: -1.565, flo
 const solar = { kwp: 8.8 };
 
 // Which lights and plugs make each window of the house picture glow at night. Window ids are fixed positions on house.png.
+// Only plugs that power a lamp belong here: a plug that is on for a TV or charger would light a window that is dark.
 const houseWindows = {
   groundLeft: { lights: ['office_light', 'office_bulb'], plugs: [] },                     // office
   groundHall: { lights: ['downstairs_hall', 'lobby'], plugs: ['downstairs_hall'] },          // hall and front door
-  groundRight: { lights: ['living_bulb_1', 'living_bulb_2', 'living_bulb_3'], plugs: ['lamp_plug', 'living_big_lamp', 'living_extension', 'tv'] }, // living room
+  groundRight: { lights: ['living_bulb_1', 'living_bulb_2', 'living_bulb_3'], plugs: ['lamp_plug', 'living_big_lamp'] }, // living room
   upLeft: { lights: ['eleanor_light'], plugs: [] },                                         // Eleanor
-  upMiddle: { lights: ['upstairs_hall'], plugs: ['upstairs_hall'] },                         // upstairs hall
+  upMiddle: { lights: ['upstairs_hall'], plugs: [] },                                     // upstairs hall
   upRight: { lights: ['michelle_light'], plugs: [] },                                       // Michelle
 };
 

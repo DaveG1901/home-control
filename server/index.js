@@ -243,7 +243,8 @@ async function start(config = defaultConfig) {
     try {
       const c = cmd.call(value);
       await ha.callService(c.domain, c.service, c.data);
-      store.log(cmd.describe(value), 'You');
+      const kind = /^(heating\.|boost:|hotwater\.)/.test(id) ? 'heating' : id.startsWith('floodlight:') ? 'security' : 'devices';
+      store.log(cmd.describe(value), 'You', kind);
       return res.json({ ok: true });
     } catch (err) {
       console.error(`[cmd] ${id} failed:`, err.message); // the details stay in the server log

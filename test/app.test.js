@@ -123,6 +123,10 @@ test('web app: auth, command allowlist, live updates', async (t) => {
   // activity log records our actions
   const after = await (await fetch(`${base}/api/state`, { headers: H })).json();
   assert.ok(after.activity.some((a) => /Dishwasher switched off/.test(a.text)));
+  // each entry says which page it belongs to, so Heating never lists camera detections
+  assert.equal(after.activity.find((a) => /Dishwasher switched off/.test(a.text)).kind, 'devices');
+  assert.equal(after.activity.find((a) => /floodlight/i.test(a.text)).kind, 'security');
+  assert.equal(after.activity.find((a) => /Hot water boost/.test(a.text)).kind, 'heating');
 
   // history endpoint
   const hist = await (await fetch(`${base}/api/history`, { headers: H })).json();

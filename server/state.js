@@ -104,13 +104,14 @@ class Store extends EventEmitter {
     if (!next || next.state !== 'on' || (old && old.state === 'on')) return;
     for (const cam of E.cameras) {
       for (const [kind, ids] of Object.entries(cam.detect)) {
-        if (ids.includes(entityId)) { this.log(`${cam.name} · ${kind} detected`, 'Camera'); return; }
+        if (ids.includes(entityId)) { this.log(`${cam.name} · ${kind} detected`, 'Camera', 'security'); return; }
       }
     }
   }
 
-  log(text, tag) {
-    this.activity.unshift({ t: Date.now(), text, tag });
+  /** kind says which page it belongs to: heating, security or devices. */
+  log(text, tag, kind = null) {
+    this.activity.unshift({ t: Date.now(), text, tag, kind });
     if (this.activity.length > 50) this.activity.length = 50;
     this.emit('change');
   }
@@ -229,7 +230,7 @@ class Store extends EventEmitter {
       bins: this.binsSource ? this.binsSource.view() : { available: false, next: null, then: [] },
       outdoors: this.outdoorsSource ? this.outdoorsSource.view(n(E.energy.pv)) : null,
       houseWindows: this.houseWindows(),
-      activity: this.activity.slice(0, 12),
+      activity: this.activity.slice(0, 50), // each page shows its own part of it
     };
   }
 

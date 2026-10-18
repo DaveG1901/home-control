@@ -168,7 +168,16 @@ function renderHeader(m) {
   if (m.connection.mode === 'demo') chips.push('<div class="chip demo">Demo mode · sample data</div>');
   // Weather: the same source as the Outside card, tiles and house picture; Home Assistant's Met Office sensor if that is unavailable
   const ow = m.outdoors && m.outdoors.weather;
-  if (ow) chips.push(`<a class="chip" href="#/outside" title="Weather for ${esc(m.outdoors.area)}">${fx(ow.temp, 0)}°C · ${esc(ow.text)}</a>`);
+  if (ow) {
+    // one chip for the weather and any rain due within the hour (not repeated when the weather already says it is raining)
+    const r = m.outdoors.rain || {};
+    const wetWords = ow.effect === 'rain' || ow.effect === 'storm' || ow.effect === 'snow';
+    let rain = '';
+    if (r.known && r.raining && !wetWords) rain = 'raining';
+    else if (r.known && !r.raining && r.startsInMin !== null && r.startsInMin <= 60) rain = r.startsInMin <= 5 ? 'rain starting' : `rain in ${r.startsInMin} min`;
+    const wet = r.known && (r.raining || (r.startsInMin !== null && r.startsInMin <= 60));
+    chips.push(`<a class="chip${wet ? ' wxchip' : ''}" href="#/outside" title="${esc(`Weather for ${m.outdoors.area}${r.text ? `: ${r.text}` : ''}`)}">${fx(ow.temp, 0)}°C · ${esc(ow.text)}${rain ? ` · ${esc(rain)}` : ''}</a>`);
+  }
   else if (m.environment && m.environment.outsideTemp !== null) {
     chips.push(`<div class="chip">${fx(m.environment.outsideTemp, 1)}°C${m.environment.weather ? ` · ${esc(m.environment.weather)}` : ''}</div>`);
   }
@@ -178,14 +187,12 @@ function renderHeader(m) {
     const urgent = m.bins.putOutTonight || bn.daysAway === 0;
     const text = m.bins.putOutTonight ? 'Bins out tonight' : bn.daysAway === 0 ? 'Bins today' : bn.daysAway === 1 ? 'Bins tomorrow' : `Bins ${bn.short}`;
     const dots = bn.bins.map((k) => `<i class="cdot" style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('');
-    chips.push(`<a class="chip binchip${urgent ? ' urgent' : ''}" href="#/overview" title="Next bin collection: ${esc(`${bn.weekday} ${bn.dayMonth}`)}">${dots}<span>${esc(text)}</span></a>`);
+    chips.push(`<a class="chip binchip${urgent ? ' urgent' : ''}" href="#/bins" title="Next bin collection: ${esc(`${bn.weekday} ${bn.dayMonth}`)}">${dots}<span>${esc(text)}</span></a>`);
   }
   const od = m.outdoors;
   if (od) {
-    const r = od.rain;
-    if (r && r.known && (r.raining || (r.startsInMin !== null && r.startsInMin <= 60))) chips.push(`<a class="chip wxchip" href="#/overview" title="${esc(r.text)}">${r.raining ? 'Raining' : r.startsInMin <= 5 ? 'Rain starting' : `Rain in ${r.startsInMin} min`}</a>`);
-    if (od.aurora && od.aurora.worthLooking) chips.push('<a class="chip aurchip" href="#/overview" title="Northern lights may be visible: look north">Northern lights possible</a>');
-    if (od.floods && od.floods.warnings.length) { const top = od.floods.warnings[0]; chips.push(`<a class="chip floodchip${top.level <= 2 ? ' urgent' : ''}" href="#/overview" title="${esc(top.area)}">${esc(top.severity)} nearby</a>`); }
+    if (od.aurora && od.aurora.worthLooking) chips.push('<a class="chip aurchip" href="#/outside" title="Northern lights may be visible: look north">Northern lights possible</a>');
+    if (od.floods && od.floods.warnings.length) { const top = od.floods.warnings[0]; chips.push(`<a class="chip floodchip${top.level <= 2 ? ' urgent' : ''}" href="#/outside" title="${esc(top.area)}">${esc(top.severity)} nearby</a>`); }
   }
   setHTML($('#chips'), chips.join(''));
 
@@ -759,11 +766,18 @@ function renderControls(m) {
     }).join('')}</div>`);
 }
 
+// Each page shows only its own activity: Heating its heating and hot-water changes, Security camera detections and floodlights.
+const ACTIVITY_FOR = {
+  heating: { kind: 'heating', title: 'Heating activity', empty: 'No heating or hot water changes yet. Boosts and changes made here appear in this list.' },
+  security: { kind: 'security', title: 'Camera activity', empty: 'Nothing yet. Camera detections and floodlight changes appear here.' },
+};
 function renderActivity(m) {
   const time = (t) => new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const page = ACTIVITY_FOR[currentView] || { kind: null, title: 'Activity', empty: 'Nothing yet. Camera detections and your own actions appear here.' };
+  const items = m.activity.filter((a) => !page.kind || a.kind === page.kind).slice(0, 12);
   setHTML($('#activity'), `
-    <div class="hd"><h2>Activity</h2><span class="tag">Recent</span></div>
-    ${m.activity.length ? `<ul class="feed">${m.activity.map((a) => `<li><time>${time(a.t)}</time><span>${esc(a.text)}</span><span class="tag" style="flex:none">${esc(a.tag)}</span></li>`).join('')}</ul>` : '<div class="empty">Nothing yet. Camera detections and your own actions appear here.</div>'}`);
+    <div class="hd"><h2>${esc(page.title)}</h2><span class="tag">Recent</span></div>
+    ${items.length ? `<ul class="feed">${items.map((a) => `<li><time>${time(a.t)}</time><span>${esc(a.text)}</span><span class="tag" style="flex:none">${esc(a.tag)}</span></li>`).join('')}</ul>` : `<div class="empty">${esc(page.empty)}</div>`}`);
 }
 
 function renderConsumers(m) {
@@ -1068,6 +1082,7 @@ function setView(name) {
   requestAnimationFrame(drawChart); // the chart needs a visible container to measure its width
   if (name === 'overview') { pausedForIdle = false; lastActivity = Date.now(); } // the Home page never pauses
   syncStreams();
+  if (model && !VIEWER) renderActivity(model); // the activity list differs per page
 }
 const viewFromHash = () => location.hash.replace(/^#\/?/, '');
 

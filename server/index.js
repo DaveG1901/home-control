@@ -16,6 +16,7 @@ const { buildCommands, cameras } = require('./entities');
 const { createFakeHa } = require('./fakeHa');
 const { BinService, demoEvents } = require('./bins');
 const { CameraWarmer } = require('./warm');
+const { Outdoors } = require('./outdoors');
 const { bins: binsConfig } = require('./entities');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
@@ -75,6 +76,15 @@ async function start(config = defaultConfig) {
   ha.on('connected', () => { bins.refresh().then(() => store.emit('change')); });
   bins.start(() => store.emit('change'));
 
+  // Outside: live data from free public services (live mode), or made-up data in demo mode (no network).
+  let outdoors = null;
+  if (config.mode === 'demo' || config.outdoors) {
+    const E = require('./entities');
+    outdoors = new Outdoors({ area: E.area, demo: config.mode === 'demo', getKwp: () => E.solar.kwp || store.num(E.energy.maxPower) || 6.6 });
+    store.setOutdoors(outdoors);
+    outdoors.start(() => store.emit('change'));
+  }
+
   const sampler = setInterval(() => { if (store.haConnected && store.ready) history.add(store.sample()); }, SAMPLE_EVERY_MS);
 
   // ---- web app ----
@@ -107,7 +117,7 @@ async function start(config = defaultConfig) {
     res.setHeader('Referrer-Policy', 'no-referrer');
     if (config.production) res.setHeader('Strict-Transport-Security', 'max-age=31536000'); // browsers only ever use HTTPS here
     res.setHeader('Content-Security-Policy',
-      `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' ws://${host} wss://${host} ${haOrigin}; media-src 'self' blob: ${haOrigin}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
+      `default-src 'self'; img-src 'self' data: https://tilecache.rainviewer.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src 'self' ws://${host} wss://${host} ${haOrigin}; media-src 'self' blob: ${haOrigin}; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`);
     next();
   });
   app.use(express.json({ limit: '10kb' }));
@@ -180,6 +190,37 @@ async function start(config = defaultConfig) {
     } catch (err) {
       console.error(`[camera] ${cam.id} stream failed:`, err.message);
       return res.status(502).json({ error: 'Home Assistant could not start this camera' });
+    }
+  });
+
+  // The dark background map under the rain radar: only the 3x3 block of zoom-7 tiles around the area, fetched once from
+  // Esri's free map and then served from memory. The browser never contacts the map provider.
+  const MAP_LAYERS = {
+    base: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile',
+    ref: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile',
+  };
+  const mapTiles = new Map(); // "layer/x/y" -> { type, body }
+  app.get('/api/maptile/:layer/:z/:x/:y', async (req, res) => {
+    const { area } = require('./entities');
+    const z = 7; const n = 2 ** z;
+    const cx = Math.floor(((area.lon + 180) / 360) * n);
+    const r = (area.lat * Math.PI) / 180;
+    const cy = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n);
+    const x = Number(req.params.x); const y = Number(req.params.y);
+    if (!MAP_LAYERS[req.params.layer] || Number(req.params.z) !== z || Math.abs(x - cx) > 1 || Math.abs(y - cy) > 1) return res.status(404).json({ error: 'Not available' });
+    const key = `${req.params.layer}/${x}/${y}`;
+    try {
+      if (!mapTiles.has(key)) {
+        const t = await fetch(`${MAP_LAYERS[req.params.layer]}/${z}/${y}/${x}`, { headers: { 'User-Agent': 'home-control (personal home dashboard)' }, signal: AbortSignal.timeout(15_000) });
+        if (!t.ok) throw new Error(`HTTP ${t.status}`);
+        mapTiles.set(key, { type: t.headers.get('content-type') || 'image/png', body: Buffer.from(await t.arrayBuffer()) });
+      }
+      const tile = mapTiles.get(key);
+      res.setHeader('Cache-Control', 'private, max-age=604800');
+      return res.type(tile.type).send(tile.body);
+    } catch (err) {
+      console.warn(`[map] tile ${key} unavailable: ${err.message}`);
+      return res.status(502).json({ error: 'Map unavailable' });
     }
   });
 
@@ -283,6 +324,7 @@ async function start(config = defaultConfig) {
     clearInterval(sampler); clearInterval(heartbeat); auth.stop();
     ha.stop();
     bins.stop();
+    if (outdoors) outdoors.stop();
     await history.stop(); // write any unsaved chart samples
     for (const c of wss.clients) c.terminate();
     await new Promise((r) => server.close(r));

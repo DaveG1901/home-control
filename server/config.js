@@ -14,6 +14,8 @@ const config = {
   viewerPassword: env.VIEWER_PASSWORD || '',
   viewerTotpSecret: (env.VIEWER_TOTP_SECRET || '').trim(),
   databaseUrl: env.DATABASE_URL || '',
+  // Weather, radar, grid carbon, northern lights, UK solar and flood data from free public services. OUTDOORS=off to stop.
+  outdoors: env.OUTDOORS !== 'off',
   production: env.NODE_ENV === 'production',
 };
 

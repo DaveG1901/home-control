@@ -29,9 +29,23 @@ class Store extends EventEmitter {
     this.spareAvg = null; // smoothed spare solar (kW), so the card does not flicker with every cloud
     this.spareT = 0;
     this.binsSource = null; // set by the server: the bin collection service
+    this.outdoorsSource = null; // set by the server: weather, radar, grid carbon, aurora, floods
   }
 
   setBins(service) { this.binsSource = service; }
+  setOutdoors(service) { this.outdoorsSource = service; }
+
+  /** Which windows of the house picture have a light or lamp on behind them. */
+  houseWindows() {
+    const out = {};
+    const lightById = new Map(E.lights.map((l) => [l.id, l]));
+    const plugById = new Map(E.plugs.map((p) => [p.id, p]));
+    for (const [win, m] of Object.entries(E.houseWindows)) {
+      out[win] = m.lights.some((id) => lightById.has(id) && this.isOn(lightById.get(id).light))
+        || m.plugs.some((id) => plugById.has(id) && this.isOn(plugById.get(id).switch));
+    }
+    return out;
+  }
 
   applyStates(list) {
     this.entities.clear();
@@ -213,6 +227,8 @@ class Store extends EventEmitter {
       energy, today, heating, security, devices, consumers, catalogue,
       surplus: this.surplusModel(plugState, byId),
       bins: this.binsSource ? this.binsSource.view() : { available: false, next: null, then: [] },
+      outdoors: this.outdoorsSource ? this.outdoorsSource.view(n(E.energy.pv)) : null,
+      houseWindows: this.houseWindows(),
       activity: this.activity.slice(0, 12),
     };
   }

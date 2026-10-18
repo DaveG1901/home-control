@@ -393,3 +393,110 @@ body[data-role=viewer] .app{grid-template-columns:1fr}
 body[data-role=viewer] .signout-m{display:grid;place-items:center;width:36px;height:36px;padding:0;border-radius:50%;background:none;border:1px solid var(--line);color:var(--mute);cursor:pointer}
 body[data-role=viewer] main{padding-bottom:32px}
 .grid[data-view=cameras] #security{grid-column:span 12}
+
+/* ---------- the house picture follows the real sky ---------- */
+.stage .housewrap{position:absolute;left:16%;top:7%;width:72%}
+.stage .housewrap img.house{position:relative;left:auto;top:auto;width:100%;display:block;transition:filter 1.2s}
+.stage .sky{position:absolute;inset:0;border-radius:18px;overflow:hidden;pointer-events:none;transition:background 1.5s}
+.stage .sky i{position:absolute;inset:0;opacity:0;transition:opacity 1.2s}
+.stage .arc{stroke:rgba(147,197,253,.18);stroke-width:1.2;stroke-dasharray:3 6}
+.stage .sundot{fill:#e0f2fe;filter:drop-shadow(0 0 10px rgba(125,211,252,.95));transition:cx 1s,cy 1s}
+.stage .sundot.moon{fill:#cbd5e1;filter:drop-shadow(0 0 8px rgba(203,213,225,.7))}
+.stage #sunglow{transition:cx 1s,cy 1s,opacity 1s}
+/* night: darker house, stars, moon, lit windows */
+.stage.night .sky{background:radial-gradient(120% 90% at 50% 0%,rgba(30,41,99,.55),rgba(2,6,23,.15) 70%)}
+.stage.night .sky .stars{opacity:.9;background-image:radial-gradient(1px 1px at 12% 18%,#fff,transparent),radial-gradient(1px 1px at 27% 8%,#dbeafe,transparent),radial-gradient(1.5px 1.5px at 41% 22%,#fff,transparent),radial-gradient(1px 1px at 58% 6%,#e0e7ff,transparent),radial-gradient(1px 1px at 73% 15%,#fff,transparent),radial-gradient(1.5px 1.5px at 86% 9%,#dbeafe,transparent),radial-gradient(1px 1px at 93% 27%,#fff,transparent),radial-gradient(1px 1px at 6% 33%,#e0e7ff,transparent),radial-gradient(1px 1px at 35% 34%,#fff,transparent),radial-gradient(1px 1px at 66% 30%,#dbeafe,transparent);animation:twinkle 6s ease-in-out infinite alternate}
+.stage.night img.house{filter:brightness(.42) saturate(.7) drop-shadow(0 24px 36px rgba(37,99,235,.25))}
+.stage.night #sunglow{opacity:.35}
+.stage .win{position:absolute;border-radius:2px;background:linear-gradient(180deg,rgba(255,221,160,.9),rgba(255,178,90,.78));filter:blur(.7px);mix-blend-mode:screen;opacity:0;transition:opacity 1s}
+.stage.night .win.on,.stage.golden .win.on{opacity:.88;box-shadow:0 0 16px 3px rgba(255,180,90,.45)}
+/* sunrise / sunset */
+.stage.golden .sky{background:radial-gradient(90% 70% at 50% 100%,rgba(251,146,60,.32),rgba(244,114,182,.14) 45%,transparent 75%)}
+.stage.golden img.house{filter:sepia(.18) saturate(1.1) drop-shadow(0 24px 36px rgba(249,115,22,.28))}
+/* cloud, rain, snow, fog, storm */
+.stage .sky .cloud{inset:auto;width:46%;height:26%;border-radius:50%;background:radial-gradient(closest-side,rgba(148,163,184,.42),rgba(148,163,184,0));filter:blur(6px)}
+.stage .sky .c1{left:-10%;top:4%;animation:drift 60s linear infinite}
+.stage .sky .c2{left:40%;top:12%;width:38%;animation:drift 85s linear infinite reverse}
+.stage.wx-cloud .sky .cloud{opacity:.6}
+.stage.wx-overcast .sky .cloud,.stage.wet .sky .cloud,.stage.wx-snow .sky .cloud,.stage.wx-storm .sky .cloud{opacity:1}
+.stage.wx-overcast #sunglow,.stage.wet #sunglow{opacity:.35}
+.stage.wet .sky .precip{opacity:.55;background:repeating-linear-gradient(105deg,transparent 0 14px,rgba(147,197,253,.55) 14px 15px,transparent 15px 31px);background-size:62px 62px;animation:rain .5s linear infinite}
+.stage.wx-snow .sky .precip{opacity:.9;background-image:radial-gradient(2px 2px at 10% 20%,#fff,transparent),radial-gradient(2px 2px at 30% 60%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 35%,#fff,transparent),radial-gradient(2px 2px at 75% 70%,#fff,transparent),radial-gradient(1.5px 1.5px at 90% 15%,#fff,transparent);background-size:180px 180px;animation:snow 9s linear infinite}
+.stage.wx-fog .sky .fog{opacity:1;background:linear-gradient(to top,rgba(203,213,225,.32),rgba(203,213,225,.08) 60%,transparent)}
+.stage.wx-storm .sky .flash{animation:flash 7s infinite}
+@keyframes rain{to{background-position:-18px 62px}}
+@keyframes snow{to{background-position:30px 180px}}
+@keyframes drift{from{transform:translateX(-20%)}to{transform:translateX(120%)}}
+@keyframes twinkle{from{opacity:.55}to{opacity:.95}}
+@keyframes flash{0%,92%,96%,100%{opacity:0}93%,95%{opacity:.5;background:rgba(224,231,255,.6)}}
+@media(prefers-reduced-motion:reduce){.stage .sky i{animation:none!important}}
+@media(max-width:700px){
+  .stage .housewrap{position:relative;left:auto;top:auto;width:100%;grid-column:1/-1}
+  .stage .housewrap img.house{filter:drop-shadow(0 14px 22px rgba(37,99,235,.35))}
+  .stage.night .housewrap img.house{filter:brightness(.42) saturate(.7)}
+}
+
+/* ---------- Outside card ---------- */
+.outgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:18px;align-items:start}
+.wxnow{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.wxnow .t{font-size:44px;font-weight:600;letter-spacing:-.03em;line-height:1}
+.wxnow .t sup{font-size:16px;color:var(--mute);margin-left:2px}
+.wxnow b{display:block;font-size:15px}
+.wxnow small,.orow small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
+.rain{padding:12px 14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line);margin-bottom:12px}
+.rain-txt{font-size:14px;font-weight:500;margin-bottom:10px}
+.rain-txt.wet{color:#7dd3fc}
+.rbars{display:flex;align-items:flex-end;gap:5px;height:46px}
+.rbars i{flex:1;border-radius:4px 4px 2px 2px;background:rgba(96,165,250,.16)}
+.rbars i.wet{background:linear-gradient(to top,#2563eb,#38bdf8)}
+.rlabels{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:5px}
+.orow{display:flex;align-items:center;gap:12px;padding:9px 2px;border-top:1px solid var(--line)}
+.orow b{font-size:13.5px;font-weight:500}
+.orow strong{color:#a7f3d0;font-weight:600}
+.adot{width:12px;height:12px;border-radius:50%;flex:none;background:#64748b}
+.adot.green{background:#34d399;box-shadow:0 0 8px rgba(52,211,153,.6)}
+.adot.yellow{background:#facc15;box-shadow:0 0 8px rgba(250,204,21,.6)}
+.adot.amber{background:#fb923c;box-shadow:0 0 10px rgba(251,146,60,.8)}
+.adot.red{background:#f87171;box-shadow:0 0 12px rgba(248,113,113,.9)}
+.flood{border-top:1px solid var(--line);padding:9px 2px;font-size:13px}
+.flood summary{cursor:pointer;list-style:none}
+.flood p{color:var(--mute);font-size:12px;line-height:1.5;margin:8px 0 0;white-space:pre-line}
+.radar{position:relative;height:300px;border-radius:16px;overflow:hidden;background:#0b1220;border:1px solid var(--line)}
+.radar .rmap{position:absolute;left:50%;top:50%;width:768px;height:768px}
+.radar .rmap img{position:absolute;width:256px;height:256px}
+.radar .rbase img{filter:brightness(1.1) contrast(1.05)}
+.radar .rref{position:absolute;inset:0;opacity:.75;pointer-events:none}
+.radar .rframe{position:absolute;inset:0;opacity:0;transition:opacity .25s}
+.radar .rframe.on{opacity:.8}
+.radar .rhome{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#e0f2fe;box-shadow:0 0 0 4px rgba(56,189,248,.35),0 0 14px rgba(56,189,248,.9)}
+.radar .rtime{position:absolute;left:10px;top:9px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(5,12,29,.75);color:var(--ice)}
+.radar .rcredit{position:absolute;right:8px;bottom:6px;font-size:9.5px;color:rgba(203,213,225,.7);text-shadow:0 1px 2px #000}
+.radar .empty{display:grid;place-items:center;height:100%}
+.chip.wxchip{text-decoration:none;color:#7dd3fc;border-color:rgba(56,189,248,.45)}
+.chip.aurchip{text-decoration:none;color:#a7f3d0;border-color:rgba(52,211,153,.55);box-shadow:0 0 14px rgba(52,211,153,.35)}
+.chip.floodchip{text-decoration:none;color:#fde68a;border-color:rgba(250,204,21,.5)}
+.chip.floodchip.urgent{color:#fecaca;border-color:rgba(248,113,113,.6)}
+@media(max-width:700px){.outgrid{grid-template-columns:minmax(0,1fr)}.radar{height:240px}}
+
+/* ---------- Best time card ---------- */
+.bt-best{padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(34,211,238,.14),rgba(59,130,246,.12));border:1px solid rgba(96,165,250,.3);margin-bottom:14px}
+.bt-best small{display:block;color:var(--mute);font-size:12px}
+.bt-best b{display:block;font-size:30px;font-weight:600;letter-spacing:-.02em;margin:2px 0}
+.bt-best span{font-size:13px;color:var(--ice)}
+.strip{display:flex;align-items:flex-end;gap:2px;height:64px}
+.strip i{flex:1;border-radius:3px 3px 1px 1px;height:calc(14% + var(--s) * 86%);background:rgba(34,211,238,calc(.15 + var(--s) * .75))}
+.strip i.best{background:linear-gradient(to top,#22d3ee,#a5f3fc);box-shadow:0 0 10px rgba(34,211,238,.6)}
+.strip-l{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:5px}
+.vsbox{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.vsbox h3{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:0 0 10px}
+.vs{display:grid;grid-template-columns:96px minmax(0,1fr) 44px;align-items:center;gap:4px 10px;margin-bottom:8px;font-size:13px}
+.vs .bar{height:8px;border-radius:99px;background:rgba(96,165,250,.14);overflow:hidden}
+.vs .bar div{height:100%;border-radius:99px;background:linear-gradient(90deg,#3b82f6,#22d3ee)}
+.vs b{text-align:right}
+.vs small{grid-column:2/-1;color:var(--dim);font-size:11px;margin-top:-4px}
+
+/* Home page, wide screens: outside and best-time cards share the bottom row */
+@media(min-width:1101px){
+  .grid[data-view=overview] #outdoors{order:6;grid-column:span 7}
+  .grid[data-view=overview] #besttime{order:7;grid-column:span 5}
+}

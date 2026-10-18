@@ -102,6 +102,28 @@ Hosting: this runs on Render's Starter plan (always on, about $7/month). On the 
 minutes without traffic, which closes the link to Home Assistant and misses events. `/api/health` (signed in) reports
 `uptimeSeconds`: if it keeps growing between visits the service is not sleeping.
 
+## Outside (free public data, not from Home Assistant)
+
+`server/outdoors.js` fetches these on timers and keeps the last good answer if one fails. Only the **area** (middle of the
+SN7 postcode district, `area` in `server/entities.js`) is sent, never the address. `OUTDOORS=off` turns it all off.
+
+| What | Source | Shown as |
+|---|---|---|
+| Weather now, rain in the next 2 hours, sunrise/sunset, solar radiation forecast | Open-Meteo (UK Met Office models) | Outside card, "Rain in 15 min" chip, the house picture |
+| Rain radar (last ~80 minutes, animated) | RainViewer tiles, loaded by the browser; dark map from Esri, fetched by the server (9 tiles, cached) | Outside card |
+| Grid carbon intensity, next 24 h, South England | National Grid ESO Carbon Intensity API (by postcode district) | Best time to run appliances |
+| Northern lights | AuroraWatch UK (Lancaster University) | Outside card; chip when amber/red, dark and clear |
+| UK solar output | Sheffield Solar PV_Live | "Your solar vs the UK" |
+| Flood warnings within 15 km | Environment Agency flood monitoring | Outside card; chip when any are in force |
+
+- **Best time:** each half hour gets a score: 65% the solar forecast (radiation x panel size), 35% how clean the grid is.
+  The best 2-hour window starting 07:00-21:00 is suggested.
+- **Panel size:** set `solar.kwp` in `server/entities.js`; until then the inverter's 6.6 kW limit is used.
+- **The house picture:** the sun (or moon) moves along an arc from sunrise to sunset; night darkens the house and lights
+  the windows whose lights or lamps are on (`houseWindows` in `server/entities.js` says which window is which room); the
+  45 minutes around sunrise and sunset glow; cloud, rain, snow, fog and storms are drawn from the current weather.
+- Camera-only viewers get none of this.
+
 ## Known gaps
 
 - **Doorbell press alerts:** the Tapo D230 only exposes battery and detection switches in HA (no press event, no camera

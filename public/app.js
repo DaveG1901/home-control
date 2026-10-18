@@ -158,6 +158,13 @@ function renderHeader(m) {
     const dots = bn.bins.map((k) => `<i class="cdot" style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('');
     chips.push(`<a class="chip binchip${urgent ? ' urgent' : ''}" href="#/overview" title="Next bin collection: ${esc(`${bn.weekday} ${bn.dayMonth}`)}">${dots}<span>${esc(text)}</span></a>`);
   }
+  const od = m.outdoors;
+  if (od) {
+    const r = od.rain;
+    if (r && r.known && (r.raining || (r.startsInMin !== null && r.startsInMin <= 60))) chips.push(`<a class="chip wxchip" href="#/overview" title="${esc(r.text)}">${r.raining ? 'Raining' : r.startsInMin <= 5 ? 'Rain starting' : `Rain in ${r.startsInMin} min`}</a>`);
+    if (od.aurora && od.aurora.worthLooking) chips.push('<a class="chip aurchip" href="#/overview" title="Northern lights may be visible: look north">Northern lights possible</a>');
+    if (od.floods && od.floods.warnings.length) { const top = od.floods.warnings[0]; chips.push(`<a class="chip floodchip${top.level <= 2 ? ' urgent' : ''}" href="#/overview" title="${esc(top.area)}">${esc(top.severity)} nearby</a>`); }
+  }
   setHTML($('#chips'), chips.join(''));
 
   // Connection status has its own spot (top right). When all is well, phones show just the green dot.
@@ -173,12 +180,18 @@ function renderHeader(m) {
 function buildEnergy() {
   $('#energy').innerHTML = `
     <div class="hd"><h2>Energy now</h2><span class="tag" id="ems"></span></div>
-    <div class="stage">
+    <div class="stage" id="stage">
+      <div class="sky" id="sky" aria-hidden="true"><i class="stars"></i><i class="cloud c1"></i><i class="cloud c2"></i><i class="precip"></i><i class="fog"></i><i class="flash"></i></div>
       <div class="base"></div>
-      <img class="house" alt="" src="/house.png">
+      <div class="housewrap">
+        <img class="house" alt="" src="/house.png">
+        ${HOUSE_WINDOWS.map(([id, l, t, w, h]) => `<i class="win" data-win="${id}" style="left:${l}%;top:${t}%;width:${w}%;height:${h}%"></i>`).join('')}
+      </div>
       <svg class="flows" viewBox="0 0 560 320" aria-hidden="true">
         <defs><radialGradient id="sun" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#7dd3fc" stop-opacity=".5"/><stop offset=".45" stop-color="#3b82f6" stop-opacity=".16"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></radialGradient></defs>
-        <circle cx="70" cy="42" r="130" fill="url(#sun)"/>
+        <path class="arc" d="M30 150 Q280 -110 530 150" fill="none"/>
+        <circle id="sunglow" cx="70" cy="42" r="130" fill="url(#sun)"/>
+        <circle id="sundot" class="sundot" cx="70" cy="42" r="7"/>
         <g style="filter:drop-shadow(0 0 4px rgba(34,211,238,.9))"><path id="fl-solar" class="flow" d="M126 58 C148 62 162 72 186 86" fill="none" stroke="#22d3ee" stroke-width="2.4"/></g>
         <g style="filter:drop-shadow(0 0 4px rgba(96,165,250,.9))"><path id="fl-batt" class="flow off" d="M196 200 L106 200" fill="none" stroke="#60a5fa" stroke-width="2.4"/></g>
         <g style="filter:drop-shadow(0 0 4px rgba(129,140,248,.9))"><path id="fl-grid" class="flow off" d="M466 186 L404 186" fill="none" stroke="#818cf8" stroke-width="2.4"/></g>
@@ -188,6 +201,47 @@ function buildEnergy() {
       <div class="node" style="left:91%;top:58%"><small><i style="background:#818cf8"></i><span id="n-grid-l">Grid</span></small><b id="n-grid">${dash}</b></div>
       <div class="node" style="left:50%;top:94%;min-width:150px;text-align:center"><small style="justify-content:center"><i style="background:#818cf8"></i>Home using</small><b id="n-home">${dash}</b></div>
     </div>`;
+}
+
+// ---------- the house picture follows the real sky ----------
+// Window positions on house.png (percent of the picture): id, left, top, width, height.
+const HOUSE_WINDOWS = [
+  ['upLeft', 15.4, 43.6, 8.2, 14.8], ['upMiddle', 43.8, 43.2, 8.2, 15], ['upRight', 70.8, 46.7, 11, 14.2],
+  ['groundLeft', 14.4, 83, 11.6, 13], ['groundHall', 38.7, 83, 4.5, 13], ['groundHall', 48.4, 83, 8.8, 13], ['groundRight', 71.9, 84.2, 11.2, 12],
+];
+
+// A point along the arc over the house (p: 0 = rising on the left, 1 = setting on the right).
+const arcAt = (p) => { const q = 1 - p; return [q * q * 30 + 2 * q * p * 280 + p * p * 530, q * q * 150 + 2 * q * p * -110 + p * p * 150]; };
+const clock = (t) => (t ? new Date(t).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '');
+
+function updateScene(m) {
+  const o = m.outdoors;
+  const stage = $('#stage');
+  if (!stage) return;
+  const w = o && o.weather;
+  const now = Date.now();
+  let night = false; let golden = false; let p = 0.5;
+  if (w && w.sunrise && w.sunset) {
+    if (now >= w.sunrise && now <= w.sunset) p = (now - w.sunrise) / (w.sunset - w.sunrise);
+    else {
+      night = true; // the moon crosses the arc from sunset to the next sunrise
+      const start = now > w.sunset ? w.sunset : w.sunset - 864e5;
+      const end = w.nextSunrise && w.nextSunrise > now ? w.nextSunrise : w.sunrise;
+      p = Math.min(1, Math.max(0, (now - start) / Math.max(1, end - start)));
+    }
+    golden = Math.min(Math.abs(now - w.sunrise), Math.abs(now - w.sunset)) < 45 * 60_000;
+  } else if (w) night = !w.isDay;
+  const [x, y] = arcAt(p);
+  for (const id of ['#sunglow', '#sundot']) { const c = $(id); c.setAttribute('cx', x.toFixed(1)); c.setAttribute('cy', y.toFixed(1)); }
+  const effect = w ? w.effect : null;
+  stage.classList.toggle('night', night);
+  stage.classList.toggle('golden', golden);
+  for (const e of ['clear', 'cloud', 'overcast', 'rain', 'snow', 'fog', 'storm']) stage.classList.toggle(`wx-${e}`, effect === e);
+  stage.classList.toggle('wet', !!(o && o.rain && o.rain.raining) || effect === 'rain' || effect === 'storm');
+  $('#sundot').classList.toggle('moon', night);
+  const wins = m.houseWindows || {};
+  stage.querySelectorAll('.win').forEach((el) => el.classList.toggle('on', !!wins[el.dataset.win]));
+  stage.title = w ? `${w.text}, ${fx(w.temp, 0)}°C · ${night ? `sunrise ${clock(w.nextSunrise || w.sunrise)}` : `sunset ${clock(w.sunset)}`}` : '';
 }
 
 function setFlow(id, active, reverse) {
@@ -748,6 +802,115 @@ function drawChart() {
   svg.innerHTML = h;
 }
 
+// ---------- outside: weather, rain, radar, northern lights, floods ----------
+const RADAR_Z = 7; // RainViewer's free radar tiles stop at zoom 7, so the map is scaled up a little
+let radarKey = '';
+let radarTimer = null;
+
+function tileXY(lat, lon, z) {
+  const n = 256 * 2 ** z;
+  const r = (lat * Math.PI) / 180;
+  return [((lon + 180) / 360) * n, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n];
+}
+
+function buildRadar(r) {
+  const el = $('#radar');
+  if (!el) return;
+  const key = r ? `${r.host}|${r.frames.map((f) => f.path).join(',')}` : 'none';
+  if (key === radarKey) return;
+  radarKey = key;
+  clearInterval(radarTimer);
+  if (!r || !r.frames.length) { el.innerHTML = '<div class="empty">Rain radar is not available right now.</div>'; return; }
+  const [px, py] = tileXY(r.lat, r.lon, RADAR_Z);
+  const tx = Math.floor(px / 256); const ty = Math.floor(py / 256);
+  const hx = px - (tx - 1) * 256; const hy = py - (ty - 1) * 256; // the area's spot inside the 3x3 block of tiles
+  const grid = (url) => [-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => `<img alt="" loading="lazy" style="left:${(dx + 1) * 256}px;top:${(dy + 1) * 256}px" src="${url(tx + dx, ty + dy)}">`)).join('');
+  const frames = r.frames.map((f, i) => `<div class="rframe" data-i="${i}">${grid((x, y) => `${r.host}${f.path}/256/${RADAR_Z}/${x}/${y}/2/1_1.png`)}</div>`).join('');
+  el.innerHTML = `
+    <div class="rmap" style="transform-origin:${hx}px ${hy}px;transform:translate(${-hx}px,${-hy}px) scale(1.7)">
+      <div class="rbase">${grid((x, y) => `/api/maptile/base/${RADAR_Z}/${x}/${y}`)}</div>${frames}
+      <div class="rref">${grid((x, y) => `/api/maptile/ref/${RADAR_Z}/${x}/${y}`)}</div>
+    </div>
+    <i class="rhome" title="${esc(model && model.outdoors ? model.outdoors.area : '')}"></i>
+    <span class="rtime"></span>
+    <span class="rcredit">Radar © RainViewer · Map © Esri</span>`;
+  const all = [...el.querySelectorAll('.rframe')];
+  let i = all.length - 1; let hold = 0;
+  const show = () => {
+    all.forEach((f, k) => f.classList.toggle('on', k === i));
+    el.querySelector('.rtime').textContent = clock(r.frames[i].t) + (r.frames[i].t > Date.now() ? ' forecast' : '');
+  };
+  show();
+  radarTimer = setInterval(() => {
+    if (document.hidden || $('#outdoors').hidden) return; // only animate while someone can see it
+    if (i === all.length - 1 && hold++ < 3) return;     // pause on the latest picture
+    hold = 0; i = (i + 1) % all.length; show();
+  }, 600);
+}
+
+function renderOutdoors(m) {
+  const o = m.outdoors;
+  if (!o) { setHTML($('#outdoors-body'), '<div class="empty">Outside information is not available.</div>'); return; }
+  const w = o.weather;
+  $('#outdoors-title').textContent = `Outside · ${o.area.replace(/ \(.*/, '')}`;
+  const rain = o.rain || {};
+  const maxMm = Math.max(0.6, ...(rain.slots || []).map((s) => s.mm));
+  const bars = (rain.slots || []).map((s) => `<i title="${clock(s.t)}: ${s.mm.toFixed(1)} mm" style="height:${Math.max(4, (s.mm / maxMm) * 100)}%"${s.mm >= 0.1 ? ' class="wet"' : ''}></i>`).join('');
+  const a = o.aurora;
+  const auroraHtml = a ? `<div class="orow"><span class="adot ${esc(a.status)}"></span><div><b>Northern lights</b><small>${esc(a.text)}${a.worthLooking ? ' · <strong>dark and clear enough: look north now</strong>' : a.level >= 2 && !a.dark ? ' · wait until it is dark' : ''}</small></div></div>` : '';
+  const f = o.floods;
+  let floodHtml = '';
+  if (f) {
+    floodHtml = f.warnings.length
+      ? f.warnings.map((x) => `<details class="flood l${x.level}"><summary><span class="tag${x.level <= 2 ? ' warn' : ''}">${esc(x.severity)}</span> ${esc(x.area)}${x.river ? ` · ${esc(x.river)}` : ''}</summary><p>${esc(x.message || 'No details given.')}</p></details>`).join('')
+      : `<div class="orow"><span class="adot green"></span><div><b>Floods</b><small>No flood warnings within ${f.radiusKm} km</small></div></div>`;
+  }
+  setHTML($('#outdoors-body'), `
+    <div class="wxnow">
+      <div class="t">${w ? `${fx(w.temp, 0)}<sup>°C</sup>` : dash}</div>
+      <div><b>${w ? esc(w.text) : ''}</b><small>${w ? `Sunrise ${clock(w.nextSunrise && w.nextSunrise < w.sunset ? w.nextSunrise : w.sunrise)} · Sunset ${clock(w.sunset)}` : ''}</small></div>
+    </div>
+    <div class="rain">
+      <div class="rain-txt${rain.raining || rain.startsInMin !== null ? ' wet' : ''}">${esc(rain.text || '')}</div>
+      <div class="rbars">${bars}</div>
+      <div class="rlabels"><span>Now</span><span>+1 h</span><span>+2 h</span></div>
+    </div>
+    ${auroraHtml}${floodHtml}
+    ${Object.keys(o.errors || {}).length ? `<div class="sub" style="font-size:11px;margin-top:8px">Not updating right now: ${esc(Object.keys(o.errors).join(', '))}</div>` : ''}`);
+  buildRadar(o.radar);
+}
+
+// ---------- best time to run appliances, and solar compared with the UK ----------
+function renderBestTime(m) {
+  const o = m.outdoors;
+  const b = o && o.bestTime;
+  if (!b || !b.known) { setHTML($('#besttime-body'), '<div class="empty">Grid and solar forecasts are not available right now.</div>'); return; }
+  const day = (t) => { const d = new Date(t); const today = new Date(); return d.toDateString() === today.toDateString() ? 'today' : 'tomorrow'; };
+  const best = b.best;
+  const inBest = (s) => best && s.from >= best.from && s.to <= best.to;
+  const strip = b.slots.map((s) => `<i class="${inBest(s) ? 'best' : ''}" style="--s:${s.score}" title="${clock(s.from)}: ${s.carbon} g/kWh grid, ~${s.solarKw} kW solar"></i>`).join('');
+  const labels = b.slots.filter((s, i) => i % 6 === 0).map((s) => `<span>${clock(s.from)}</span>`).join('');
+  const v = o.solarVsUk;
+  let vs = '';
+  if (v) {
+    const dark = (v.homePercent || 0) < 1 && (v.ukPercent || 0) < 1;
+    const verdict = dark ? 'Both resting: no sun right now.'
+      : v.homePercent === null ? '' : v.homePercent >= v.ukPercent * 1.1 ? `Your panels are beating the UK average by ${fx(v.homePercent - v.ukPercent, 0)} points.`
+        : v.homePercent <= v.ukPercent * 0.9 ? 'The UK as a whole is doing better than your roof right now.' : 'Your panels are level with the UK average.';
+    const bar = (label, pct, note) => `<div class="vs"><span>${label}</span><div class="bar"><div style="width:${Math.min(100, pct || 0)}%"></div></div><b>${pct === null ? dash : `${fx(pct, 0)}%`}</b><small>${note}</small></div>`;
+    vs = `<div class="vsbox"><h3>Your solar vs the UK</h3>
+      ${bar('Your panels', v.homePercent, `of ${fx(v.kwp, 1)} kW`)}
+      ${bar('All UK solar', v.ukPercent, `${fx(v.ukGw, 1)} GW`)}
+      <div class="sub" style="font-size:12px;margin-top:4px">${esc(verdict)}</div></div>`;
+  }
+  setHTML($('#besttime-body'), `
+    ${best ? `<div class="bt-best"><small>Best 2 hours ${day(best.from)}</small><b>${clock(best.from)}–${clock(best.to)}</b><span>${esc(best.reason)}</span></div>` : ''}
+    <div class="strip">${strip}</div>
+    <div class="strip-l">${labels}</div>
+    <div class="sub" style="font-size:12px;margin-top:6px">Grid now: <b>${b.now.carbon} g CO₂/kWh</b> (${esc(b.now.index)}${o.carbonRegion ? `, ${esc(o.carbonRegion)}` : ''}). Taller and brighter = more sun and a cleaner grid.</div>
+    ${vs}`);
+}
+
 // ---------- render ----------
 function renderAll() {
   const m = model;
@@ -755,6 +918,9 @@ function renderAll() {
   renderHeader(m);
   if (VIEWER) { renderSecurity(m); return; }
   updateEnergy(m.energy);
+  updateScene(m);
+  renderOutdoors(m);
+  renderBestTime(m);
   renderToday(m);
   renderSurplus(m);
   renderBins(m);
@@ -789,8 +955,8 @@ function connect() {
 
 // ---------- views (side navigation) ----------
 const VIEWS = {
-  overview: ['energy', 'consumers', 'security', 'heating', 'bins'],
-  energy: ['energy', 'today', 'surplus', 'power', 'consumers'],
+  overview: ['energy', 'consumers', 'security', 'heating', 'bins', 'outdoors', 'besttime'],
+  energy: ['energy', 'today', 'besttime', 'surplus', 'power', 'consumers'],
   heating: ['heating', 'activity'],
   security: ['security', 'activity'],
   devices: ['plugs', 'lights'],

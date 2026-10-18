@@ -22,6 +22,7 @@ function seed() {
   set('sensor.sigen_plant_grid_export_power', 0, { unit_of_measurement: 'kW' });
   set('sensor.sigen_plant_ems_work_mode', 'Maximum Self Consumption');
   set('sensor.sigen_plant_rated_energy_capacity', 9.04, { unit_of_measurement: 'kWh' });
+  set('sensor.sigen_plant_max_active_power', 6.6, { unit_of_measurement: 'kW' });
   set('sensor.sigen_plant_daily_pv_energy', 4.98, { unit_of_measurement: 'kWh' });
   set('sensor.sigen_plant_daily_load_consumption', 14.29, { unit_of_measurement: 'kWh' });
   set('sensor.sigen_plant_daily_grid_import_energy', 6.45, { unit_of_measurement: 'kWh' });

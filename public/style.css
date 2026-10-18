@@ -586,18 +586,20 @@ nav button.link .lbl{display:none}
   nav .more{display:flex;flex:1;width:auto;height:54px;flex-direction:column;align-items:center;justify-content:center;gap:3px;border-radius:12px}
   nav .more .lbl{display:block;font-size:10px;line-height:1;letter-spacing:.02em}
   nav .more.on,nav .more[aria-expanded=true]{background:rgba(59,130,246,.2);color:var(--text)}
-  /* the drawer: the same menu slides in from the left with every page */
+  /* the drawer: the same menu slides in from the right (the side the More button is on) with every page */
   .drawer-back{position:fixed;inset:0;background:rgba(3,8,20,.55);backdrop-filter:blur(2px);z-index:35}
-  body.drawer-open nav{top:0;bottom:0;left:0;right:auto;width:min(280px,84vw);height:auto;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:4px;
-    padding:16px 12px calc(16px + env(safe-area-inset-bottom));border-top:0;border-right:1px solid var(--line2);background:var(--card-solid);z-index:40;
-    box-shadow:12px 0 40px rgba(0,0,0,.35);animation:drawer .2s ease-out}
+  body.drawer-open nav{top:0;bottom:0;left:auto;right:0;width:min(280px,84vw);height:auto;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:4px;
+    padding:16px 12px calc(16px + env(safe-area-inset-bottom));border-top:0;border-left:1px solid var(--line2);background:var(--card-solid);z-index:40;
+    box-shadow:-12px 0 40px rgba(0,0,0,.35);animation:drawer .2s ease-out}
   body.drawer-open nav a,body.drawer-open nav a:not(.pri){display:flex;flex:none;flex-direction:row;justify-content:flex-start;align-items:center;gap:14px;height:48px;padding:0 14px}
   body.drawer-open nav a .lbl{font-size:15px;letter-spacing:0}
   body.drawer-open nav .more{display:none}
   body.drawer-open nav .navtoggle{display:flex;width:auto;justify-content:flex-start;padding:0 14px;margin-bottom:8px}
   body.drawer-open nav .nav-spacer{flex:1}
 }
-@keyframes drawer{from{transform:translateX(-100%)}to{transform:none}}
+@keyframes drawer{from{transform:translateX(100%)}to{transform:none}}
+/* on phones the drawer opens from the right, under the More button; its close button sits on that side too */
+@media(max-width:700px){body.drawer-open nav .navtoggle{align-self:flex-end;width:46px;justify-content:center;padding:0}}
 
 /* ---------- Home: heating summary and the row of tiles ---------- */
 .hs-main{display:flex;align-items:center;gap:16px;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.22),var(--panel));border:1px solid var(--line2)}

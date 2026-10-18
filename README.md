@@ -110,7 +110,7 @@ page. Pages: Home, Energy, Heating, Security, Plugs, Lights, Outside, Bins, Repo
 `#/devices` still works and opens Plugs).
 
 - **Computers:** a sidebar of icons; the ☰ at the top widens it to show page names (remembered per device).
-- **Phones:** a bottom bar with Home, Energy, Heating, Security and **More**, which slides a menu in from the left with
+- **Phones:** a bottom bar with Home, Energy, Heating, Security and **More**, which slides a menu in from the right with
   every page.
 
 ## Light and dark theme
@@ -122,8 +122,8 @@ drawn, so there is no flash; the sign-in page follows it too. Colours are theme 
 
 ## Outside (free public data, not from Home Assistant)
 
-`server/outdoors.js` fetches these on timers and keeps the last good answer if one fails. Only the **area** (middle of the
-SN7 postcode district, `area` in `server/entities.js`) is sent, never the address. `OUTDOORS=off` turns it all off.
+`server/outdoors.js` fetches these on timers and keeps the last good answer if one fails. Only the **area** (the middle of
+Uffington, `area` in `server/entities.js`; the SN7 district for grid carbon) is sent, never the address. `OUTDOORS=off` turns it all off.
 
 | What | Source | Shown as |
 |---|---|---|

@@ -285,9 +285,9 @@ function watchedEntities() {
 }
 
 // ---- outside the house (free public data, no Home Assistant needed) ----
-// The area, not the house: the middle of the SN7 postcode district. Only this is ever sent to the weather, radar,
-// carbon-intensity and flood services.
-const area = { name: 'Faringdon', postcode: 'SN7', lat: 51.66, lon: -1.59, floodRadiusKm: 15 };
+// The village, not the house: the middle of Uffington. Only this (and the SN7 postcode district, for grid carbon) is ever
+// sent to the weather, radar, carbon-intensity and flood services.
+const area = { name: 'Uffington', postcode: 'SN7', lat: 51.598, lon: -1.565, floodRadiusKm: 15 };
 
 // The panels' rated size in kWp (from the installation paperwork). If unset, the inverter's 6.6 kW limit is used.
 const solar = { kwp: 8.8 };

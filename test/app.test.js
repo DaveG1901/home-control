@@ -71,6 +71,8 @@ test('web app: auth, command allowlist, live updates', async (t) => {
   assert.equal((await fetch(`${base}/`, { redirect: 'manual' })).status, 302);
   assert.equal((await fetch(`${base}/healthz`)).status, 200);
   assert.equal((await fetch(`${base}/login`)).status, 200);
+  assert.equal((await fetch(`${base}/theme.js`)).status, 200, 'the theme loads on the sign-in page too');
+  assert.equal((await fetch(`${base}/app.js`, { redirect: 'manual' })).status, 302, 'the app itself still needs a session');
 
   // wrong password, then right password
   const bad = await fetch(`${base}/api/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: 'nope' }) });

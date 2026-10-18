@@ -3,13 +3,15 @@
   --line:rgba(124,166,255,.14); --line2:rgba(124,166,255,.26);
   --text:#e8f0ff; --mute:#8ea3cf; --dim:#5f739f;
   --blue:#3b82f6; --sky:#60a5fa; --ice:#bfdbfe; --cyan:#22d3ee; --indigo:#818cf8; --amber:#f2b84b;
+  --panel:rgba(8,20,48,.55); --panel2:rgba(8,20,48,.7); --node:rgba(9,22,50,.82); --navbg:rgba(5,12,29,.6); --navbg2:rgba(5,12,29,.94);
+  color-scheme:dark;
 }
 *{box-sizing:border-box;margin:0}
 html,body{background:var(--bg)}
 body{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text);font-size:14px;line-height:1.45;
   background:radial-gradient(1200px 600px at 78% -10%,rgba(59,130,246,.22),transparent 60%),radial-gradient(900px 500px at -10% 30%,rgba(34,211,238,.08),transparent 60%),var(--bg);min-height:100vh}
 .app{display:grid;grid-template-columns:76px 1fr;min-height:100vh}
-nav{border-right:1px solid var(--line);padding:18px 0;display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(5,12,29,.6);position:sticky;top:0;height:100vh}
+nav{border-right:1px solid var(--line);padding:18px 0;display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--navbg);position:sticky;top:0;height:100vh}
 .logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#3b82f6,#22d3ee);display:grid;place-items:center;margin-bottom:18px;box-shadow:0 6px 22px rgba(59,130,246,.45)}
 .logo svg{width:20px;height:20px;stroke:#04122e}
 nav a{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;color:var(--mute);cursor:pointer;transition:.2s}
@@ -38,7 +40,7 @@ h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 .stage img.house{position:absolute;left:16%;top:7%;width:72%;height:auto;filter:drop-shadow(0 24px 36px rgba(37,99,235,.38))}
 .stage .base{position:absolute;left:10%;right:10%;bottom:10%;height:16%;background:radial-gradient(closest-side,rgba(59,130,246,.30),transparent);filter:blur(10px)}
 .stage svg{position:absolute;inset:0;width:100%;height:100%}
-.node{position:absolute;transform:translate(-50%,-50%);padding:9px 14px;border-radius:14px;background:rgba(9,22,50,.82);border:1px solid var(--line2);backdrop-filter:blur(8px);min-width:112px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.node{position:absolute;transform:translate(-50%,-50%);padding:9px 14px;border-radius:14px;background:var(--node);border:1px solid var(--line2);backdrop-filter:blur(8px);min-width:112px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .node b{display:block;font-size:19px;font-weight:600;letter-spacing:-.02em}
 .node small{color:var(--mute);font-size:11.5px;display:flex;align-items:center;gap:6px}
 .node i{width:7px;height:7px;border-radius:50%;display:inline-block}
@@ -46,7 +48,7 @@ h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 @keyframes dash{to{stroke-dashoffset:-12}}
 /* stats */
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.kpi{padding:14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line)}
+.kpi{padding:14px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
 .kpi span{display:block;color:var(--mute);font-size:12px}
 .kpi b{font-size:24px;font-weight:600;letter-spacing:-.02em}
 .kpi em{font-style:normal;color:var(--dim);font-size:12px;margin-left:3px}
@@ -56,23 +58,23 @@ h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 .row{display:flex;justify-content:space-between;align-items:center;color:var(--mute);font-size:12.5px;margin-bottom:7px}
 .row b{color:var(--text);font-weight:600}
 /* heating */
-.big{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.28),rgba(8,20,48,.5));border:1px solid var(--line2)}
+.big{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,rgba(37,99,235,.28),var(--panel));border:1px solid var(--line2)}
 .big .t{font-size:46px;font-weight:600;letter-spacing:-.04em;line-height:1}
 .big .t sup{font-size:20px;color:var(--sky);font-weight:500}
 .stepper{display:flex;align-items:center;gap:12px}
-.stepper button{width:38px;height:38px;border-radius:12px;border:1px solid var(--line2);background:rgba(8,20,48,.7);color:var(--ice);font-size:20px;cursor:pointer;transition:.15s}
+.stepper button{width:38px;height:38px;border-radius:12px;border:1px solid var(--line2);background:var(--panel2);color:var(--ice);font-size:20px;cursor:pointer;transition:.15s}
 .stepper button:hover{background:rgba(59,130,246,.3);border-color:var(--sky)}
 .stepper div{text-align:center}.stepper div b{font-size:22px;font-weight:600}
 .stepper div small{display:block;color:var(--mute);font-size:11px}
-.seg{display:inline-flex;background:rgba(8,20,48,.7);border:1px solid var(--line);border-radius:12px;padding:3px;margin:14px 0}
+.seg{display:inline-flex;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:3px;margin:14px 0}
 .seg button{border:0;background:none;color:var(--mute);padding:7px 16px;border-radius:9px;font:inherit;font-size:13px;cursor:pointer}
 .seg button.on{background:var(--blue);color:#fff;box-shadow:0 4px 14px rgba(59,130,246,.45)}
 .zones{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
-.zone{padding:10px 12px;border-radius:12px;background:rgba(8,20,48,.55);border:1px solid var(--line)}
+.zone{padding:10px 12px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
 .zone small{color:var(--mute);font-size:11.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .zone b{font-size:17px;font-weight:600}
 .zone .bar{height:4px;margin-top:6px}
-.hw{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:13px 16px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line);gap:10px;flex-wrap:wrap}
+.hw{display:flex;align-items:center;justify-content:space-between;margin-top:14px;padding:13px 16px;border-radius:14px;background:var(--panel);border:1px solid var(--line);gap:10px;flex-wrap:wrap}
 .hw .l{display:flex;align-items:center;gap:12px}
 .ico{width:36px;height:36px;border-radius:11px;background:rgba(59,130,246,.2);display:grid;place-items:center;color:var(--sky);flex:none}
 .ico svg{width:19px;height:19px}
@@ -87,7 +89,7 @@ h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 .sw.lock{opacity:.4;cursor:not-allowed}
 /* security */
 .cams{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.cam{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:rgba(8,20,48,.55)}
+.cam{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:var(--panel)}
 .view{aspect-ratio:16/10;position:relative;background:
   radial-gradient(120px 70px at 70% 30%,rgba(96,165,250,.22),transparent 70%),
   linear-gradient(180deg,#0b1a3b 0%,#070f24 62%,#0a1a3a 62%,#060d1f 100%);display:grid;place-items:center;color:var(--dim)}
@@ -97,7 +99,7 @@ h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 .cam .m{padding:9px 11px;display:flex;justify-content:space-between;align-items:center;gap:6px}
 .cam .m b{font-size:12.5px;font-weight:600}.cam .m small{display:block;color:var(--mute);font-size:11px}
 .bells{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.bell{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line)}
+.bell{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
 .bell b{font-weight:600}.bell small{display:block;color:var(--mute);font-size:12px}
 .batt{margin-left:auto;text-align:right;font-size:12px;color:var(--ice)}
 /* chart */
@@ -106,7 +108,7 @@ h1{font-size:25px;font-weight:600;letter-spacing:-.02em}
 #chart{width:100%;height:230px;display:block}
 /* lists */
 .dev{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.d{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:13px;background:rgba(8,20,48,.55);border:1px solid var(--line)}
+.d{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:13px;background:var(--panel);border:1px solid var(--line)}
 .d b{display:block;font-size:13px;font-weight:600}.d small{color:var(--mute);font-size:11.5px}
 .d .sw{margin-left:auto}
 .feed{list-style:none;padding:0}
@@ -172,7 +174,7 @@ nav a .lbl{display:none}
   /* sidebar becomes a bottom tab bar */
   nav{display:flex;flex-direction:row;justify-content:space-around;align-items:stretch;position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;
     padding:6px 6px calc(6px + env(safe-area-inset-bottom));gap:2px;border-right:0;border-top:1px solid var(--line);
-    background:rgba(5,12,29,.94);backdrop-filter:blur(14px);z-index:20}
+    background:var(--navbg2);backdrop-filter:blur(14px);z-index:20}
   nav .logo,nav .nav-spacer,nav #logout{display:none}
   nav a{flex:1;width:auto;height:54px;flex-direction:column;gap:3px;border-radius:12px}
   nav a{display:flex;align-items:center;justify-content:center}
@@ -221,7 +223,7 @@ main,.card,.top>div{min-width:0}
 .sp-legend b{color:var(--text);font-weight:600}
 .sp-legend span[style]::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--c)}
 .sp-devs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.spd{padding:14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.spd{padding:14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .spd.good{border-color:rgba(34,211,238,.45);box-shadow:inset 0 0 0 1px rgba(34,211,238,.12)}
 .spd.running{border-color:rgba(96,165,250,.55)}
 .spd .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -247,7 +249,7 @@ main,.card,.top>div{min-width:0}
 .view:focus-visible{outline:2px solid #60a5fa;outline-offset:-2px}
 
 /* ---------- heating boost ---------- */
-.boostrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line);font-size:13px;color:var(--mute)}
+.boostrow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);font-size:13px;color:var(--mute)}
 .boostrow.on{border-color:rgba(242,184,75,.45);color:var(--amber);background:rgba(242,184,75,.07)}
 .bbtns{display:flex;gap:8px;flex-wrap:wrap}
 .zone.boosting{border-color:rgba(242,184,75,.5);box-shadow:inset 0 0 0 1px rgba(242,184,75,.12)}
@@ -262,13 +264,13 @@ main,.card,.top>div{min-width:0}
 .bmenu .x{flex:0 0 28px;background:none;color:var(--mute)}
 
 /* ---------- plugs and lights lists ---------- */
-.filter{width:100%;max-width:420px;margin:0 0 16px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(8,20,48,.7);color:var(--text);font:inherit;font-size:14px;outline:none}
+.filter{width:100%;max-width:420px;margin:0 0 16px;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;font-size:14px;outline:none}
 .filter:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
 .dgroups{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:20px 22px;align-items:start}
 .dgroup{display:flex;flex-direction:column;gap:8px;min-width:0}
 .dgh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;color:var(--mute);font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;padding:0 2px}
 .dgh small{font-size:11.5px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--dim)}
-.drow{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;background:rgba(8,20,48,.55);border:1px solid var(--line)}
+.drow{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:13px;background:var(--panel);border:1px solid var(--line)}
 .drow.off{opacity:.55}
 .drow .dn{flex:1;min-width:0}
 .drow .dn b{display:block;font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -284,7 +286,7 @@ a.tag:hover{background:rgba(59,130,246,.3)}
 select.filter{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:40px;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238ea3cf' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 14px center;background-size:16px}
-select.filter option{background:#0e1d42;color:#e8f0ff}
+select.filter option{background:var(--card-solid);color:var(--text)}
 
 /* ---------- bindicator ---------- */
 .bin-date{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -443,7 +445,7 @@ body[data-role=viewer] main{padding-bottom:32px}
 .wxnow .t sup{font-size:16px;color:var(--mute);margin-left:2px}
 .wxnow b{display:block;font-size:15px}
 .wxnow small,.orow small{display:block;color:var(--mute);font-size:12px;margin-top:2px}
-.rain{padding:12px 14px;border-radius:14px;background:rgba(8,20,48,.55);border:1px solid var(--line);margin-bottom:12px}
+.rain{padding:12px 14px;border-radius:14px;background:var(--panel);border:1px solid var(--line);margin-bottom:12px}
 .rain-txt{font-size:14px;font-weight:500;margin-bottom:10px}
 .rain-txt.wet{color:#7dd3fc}
 .rbars{display:flex;align-items:flex-end;gap:5px;height:46px}
@@ -499,4 +501,65 @@ body[data-role=viewer] main{padding-bottom:32px}
 @media(min-width:1101px){
   .grid[data-view=overview] #outdoors{order:6;grid-column:span 7}
   .grid[data-view=overview] #besttime{order:7;grid-column:span 5}
+}
+
+/* ---------- theme switch in the header (Automatic / Light / Dark) ---------- */
+.themebtn{display:grid;place-items:center;width:36px;height:36px;padding:0;border-radius:50%;background:var(--card);border:1px solid var(--line);color:var(--mute);cursor:pointer;flex:none;transition:.15s}
+.themebtn:hover{color:var(--text);border-color:var(--line2)}
+.themebtn svg{width:18px;height:18px}
+
+/* ---------- light theme ----------
+   The same layout and blues on a pale background. Things that are dark on purpose stay dark in both themes: camera
+   pictures, the rain radar, the toast, and the house picture at night (a night sky). */
+html[data-theme=light]{
+  --bg:#eef3fb; --bg2:#e2eaf7; --card:rgba(255,255,255,.8); --card-solid:#ffffff;
+  --line:rgba(30,64,175,.12); --line2:rgba(30,64,175,.22);
+  --text:#0f1d3d; --mute:#4a5d86; --dim:#7487ad;
+  --blue:#2563eb; --sky:#2563eb; --ice:#1e40af; --cyan:#0891b2; --indigo:#4f46e5; --amber:#b45309;
+  --panel:rgba(236,242,252,.9); --panel2:#ffffff; --node:rgba(255,255,255,.93); --navbg:rgba(255,255,255,.72); --navbg2:rgba(255,255,255,.96);
+  color-scheme:light;
+}
+html[data-theme=light] body{background:radial-gradient(1200px 600px at 78% -10%,rgba(59,130,246,.13),transparent 60%),radial-gradient(900px 500px at -10% 30%,rgba(34,211,238,.08),transparent 60%),var(--bg)}
+html[data-theme=light] .card{box-shadow:0 1px 2px rgba(15,29,61,.04),0 10px 30px rgba(30,64,175,.07)}
+html[data-theme=light] .card::before{background:none}
+html[data-theme=light] .node{box-shadow:0 6px 18px rgba(30,64,175,.13)}
+html[data-theme=light] nav a.on{color:#1d4ed8;background:rgba(37,99,235,.12);box-shadow:inset 0 0 0 1px rgba(37,99,235,.3)}
+html[data-theme=light] nav a:hover{background:rgba(37,99,235,.08)}
+html[data-theme=light] .big{background:linear-gradient(135deg,rgba(37,99,235,.12),var(--panel))}
+html[data-theme=light] .sw{background:rgba(30,64,175,.18)}
+html[data-theme=light] .sw::after{background:#fff;box-shadow:0 1px 3px rgba(15,29,61,.25)}
+html[data-theme=light] .chip.bad{color:#b91c1c;border-color:rgba(220,38,38,.35);background:rgba(220,38,38,.06)}
+html[data-theme=light] .fit.good{color:#0e7490}
+html[data-theme=light] .orow strong{color:#047857}
+html[data-theme=light] .rain-txt.wet{color:#0369a1}
+html[data-theme=light] .chip.wxchip{color:#0369a1;border-color:rgba(3,105,161,.35)}
+html[data-theme=light] .chip.aurchip{color:#047857;border-color:rgba(4,120,87,.45);box-shadow:0 0 12px rgba(16,185,129,.25)}
+html[data-theme=light] .chip.floodchip{color:#a16207;border-color:rgba(161,98,7,.4)}
+html[data-theme=light] .chip.floodchip.urgent{color:#b91c1c;border-color:rgba(220,38,38,.45)}
+/* camera pictures and the radar stay dark: keep their labels light */
+html[data-theme=light] .live,html[data-theme=light] .radar .rtime{color:#bfdbfe}
+html[data-theme=light] .vmsg{color:#a9bbdd}
+html[data-theme=light] .view{color:#8ea3cf}
+html[data-theme=light] .ask{box-shadow:0 24px 60px rgba(15,29,61,.25)}
+html[data-theme=light] .ask::backdrop{background:rgba(15,29,61,.35)}
+html[data-theme=light] .bin-then i,html[data-theme=light] .chip .cdot{box-shadow:inset 0 0 0 1px rgba(15,29,61,.18)}
+
+/* the house picture by day: a soft blue sky; at night it keeps a real night sky, so the lit windows still show */
+html[data-theme=light] .stage .sky{background:linear-gradient(180deg,rgba(147,197,253,.38),rgba(219,234,254,.25) 55%,transparent 85%)}
+html[data-theme=light] .stage img.house{filter:drop-shadow(0 20px 28px rgba(37,99,235,.25))}
+html[data-theme=light] .stage.night img.house{filter:brightness(.42) saturate(.7) drop-shadow(0 20px 28px rgba(15,29,61,.3))}
+html[data-theme=light] .stage.golden:not(.night) img.house{filter:sepia(.18) saturate(1.1) drop-shadow(0 20px 28px rgba(249,115,22,.25))}
+html[data-theme=light] .stage .sundot{fill:#fbbf24;filter:drop-shadow(0 0 10px rgba(251,191,36,.9))}
+html[data-theme=light] .stage .arc{stroke:rgba(37,99,235,.22)}
+html[data-theme=light] .stage.night .sky{background:linear-gradient(180deg,#0a1633,#13244d 70%,#1b2f5e)}
+html[data-theme=light] .stage.night .sundot.moon{fill:#e2e8f0;filter:drop-shadow(0 0 8px rgba(226,232,240,.8))}
+html[data-theme=light] .stage.golden .sky{background:linear-gradient(180deg,rgba(253,186,116,.35),rgba(251,207,232,.25) 55%,transparent 90%)}
+html[data-theme=light] .stage.wet .sky .precip{background:repeating-linear-gradient(105deg,transparent 0 14px,rgba(37,99,235,.35) 14px 15px,transparent 15px 31px);background-size:62px 62px}
+html[data-theme=light] .stage.night.wet .sky .precip{background:repeating-linear-gradient(105deg,transparent 0 14px,rgba(147,197,253,.55) 14px 15px,transparent 15px 31px);background-size:62px 62px}
+html[data-theme=light] .stage.wx-snow:not(.night) .sky .precip{filter:drop-shadow(0 0 1px rgba(71,85,105,.9))}
+html[data-theme=light] .stage .sky .cloud{background:radial-gradient(closest-side,rgba(148,163,184,.5),rgba(148,163,184,0))}
+html[data-theme=light] .stage.wx-fog .sky .fog{background:linear-gradient(to top,rgba(148,163,184,.4),rgba(148,163,184,.1) 60%,transparent)}
+@media(max-width:700px){
+  html[data-theme=light] .stage .housewrap img.house{filter:drop-shadow(0 12px 18px rgba(37,99,235,.22))}
+  html[data-theme=light] .stage.night .housewrap img.house{filter:brightness(.42) saturate(.7)}
 }

@@ -102,6 +102,13 @@ Hosting: this runs on Render's Starter plan (always on, about $7/month). On the 
 minutes without traffic, which closes the link to Home Assistant and misses events. `/api/health` (signed in) reports
 `uptimeSeconds`: if it keeps growing between visits the service is not sleeping.
 
+## Light and dark theme
+
+A switch in the header cycles **Automatic** (the default: follows the device's own light/dark setting, live) → **Light** →
+**Dark**. The choice is remembered per device (browser storage). `public/theme.js` applies it in `<head>` before the page is
+drawn, so there is no flash; the sign-in page follows it too. Colours are theme variables in `style.css` (`:root` for dark,
+`html[data-theme=light]` for light). Camera pictures, the rain radar and the house picture at night stay dark in both.
+
 ## Outside (free public data, not from Home Assistant)
 
 `server/outdoors.js` fetches these on timers and keeps the last good answer if one fails. Only the **area** (middle of the

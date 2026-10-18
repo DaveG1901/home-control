@@ -33,7 +33,13 @@ input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
 button#go{width:100%;margin-top:14px;padding:13px;border:0;border-radius:13px;background:var(--blue);color:#fff;font:inherit;font-weight:600;font-size:15px;cursor:pointer;box-shadow:0 6px 20px rgba(59,130,246,.4)}
 button:disabled{opacity:.6;cursor:wait}
 #err{min-height:20px;margin-top:12px;font-size:13px;color:#fca5a5}
+html[data-theme=light]{--bg:#eef3fb;--text:#0f1d3d;--mute:#4a5d86;--line:rgba(30,64,175,.2);color-scheme:light}
+html[data-theme=light] body{background:radial-gradient(900px 500px at 70% -10%,rgba(59,130,246,.16),transparent 60%),radial-gradient(700px 400px at 0% 100%,rgba(34,211,238,.08),transparent 60%),var(--bg)}
+html[data-theme=light] .box{background:rgba(255,255,255,.85);box-shadow:0 10px 40px rgba(30,64,175,.1)}
+html[data-theme=light] input{background:#fff}
+html[data-theme=light] #err{color:#b91c1c}
 </style>
+<script src="/theme.js"></script>
 </head>
 <body>
 <form class="box" id="f" autocomplete="on">
@@ -48,7 +54,7 @@ button:disabled{opacity:.6;cursor:wait}
     </button>
   </div>
   <div class="code" id="code-row" hidden>
-    <input type="text" id="code" name="code" placeholder="Authenticator code (6 digits)" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">
+    <input type="text" id="code" name="code" placeholder="Authenticator code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">
   </div>
   <button type="submit" id="go">Sign in</button>
   <div id="err" role="alert"></div>

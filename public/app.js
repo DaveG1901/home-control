@@ -139,6 +139,25 @@ document.querySelectorAll('#logout, #logout-m').forEach((b) => b.addEventListene
   location.href = '/login';
 }));
 
+// ---------- light / dark theme (theme.js applies it; this is the switch in the header) ----------
+const THEME_NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
+const THEME_NAME = { auto: 'Automatic (follows this device)', light: 'Light', dark: 'Dark' };
+function showTheme() {
+  const b = $('#theme');
+  if (!b || !window.hcTheme) return;
+  const c = window.hcTheme.choice();
+  b.querySelector('use').setAttribute('href', c === 'light' ? '#i-sun' : c === 'dark' ? '#i-moon' : '#i-auto');
+  b.title = `Theme: ${THEME_NAME[c]}. Tap for ${THEME_NAME[THEME_NEXT[c]].replace(/ \(.*/, '')}`;
+  b.setAttribute('aria-label', b.title);
+}
+$('#theme').addEventListener('click', () => {
+  const next = THEME_NEXT[window.hcTheme.choice()];
+  window.hcTheme.set(next);
+  toast(`Theme: ${THEME_NAME[next]}`);
+});
+document.addEventListener('themechange', showTheme);
+showTheme();
+
 // ---------- header ----------
 function renderHeader(m) {
   const hr = new Date().getHours();

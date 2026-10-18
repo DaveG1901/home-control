@@ -20,7 +20,7 @@ const { Outdoors } = require('./outdoors');
 const { bins: binsConfig } = require('./entities');
 
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
-const OPEN_PATHS = new Set(['/login', '/login.html', '/login.js', '/healthz', '/favicon.svg']);
+const OPEN_PATHS = new Set(['/login', '/login.html', '/login.js', '/theme.js', '/healthz', '/favicon.svg']);
 const SAMPLE_EVERY_MS = 30_000;
 
 function sameOrigin(req) {

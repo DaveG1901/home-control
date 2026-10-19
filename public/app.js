@@ -84,6 +84,7 @@ document.addEventListener('click', (e) => {
   const t = e.target.closest('[data-cmd],[data-act]');
   if (!t || t.disabled || !model) return;
   if (t.dataset.act === 'step') return stepTarget(Number(t.dataset.d));
+  if (t.dataset.act === 'lightpanel') { openLightPanel(t.dataset.l); return; }
   if (t.dataset.act === 'boostmenu') { openBoost = openBoost === t.dataset.z ? null : t.dataset.z; return renderAll(); }
   const id = t.dataset.cmd;
   let value;
@@ -269,7 +270,12 @@ function updateScene(m) {
   stage.classList.toggle('wet', !!(o && o.rain && o.rain.raining) || effect === 'rain' || effect === 'storm');
   $('#sundot').classList.toggle('moon', night);
   const wins = m.houseWindows || {};
-  stage.querySelectorAll('.win').forEach((el) => el.classList.toggle('on', !!wins[el.dataset.win]));
+  stage.querySelectorAll('.win').forEach((el) => {
+    const w = wins[el.dataset.win];
+    const on = !!(w && (w === true || w.on));
+    el.classList.toggle('on', on);
+    if (on && w.rgb) { el.style.setProperty('--wc', w.rgb.join(',')); el.style.setProperty('--wl', String(0.35 + 0.6 * (w.level ?? 1))); }
+  });
   stage.title = w ? `${w.text}, ${fx(w.temp, 0)}°C · ${night ? `sunrise ${clock(w.nextSunrise || w.sunrise)}` : `sunset ${clock(w.sunset)}`}` : '';
 }
 
@@ -485,17 +491,85 @@ function buildDevices() {
 // Plugs marked important ask for confirmation before they are switched off (see the click handler).
 const WARN_NOTE = { critical: 'Important', network: 'Powers network or cameras' };
 
+// A light's colour in words: "warm white", "purple"...
+function colourName(l) {
+  if (l.mode === 'color_temp' && l.kelvin) return l.kelvin < 3300 ? 'warm white' : l.kelvin > 5000 ? 'cool white' : 'white';
+  if (!l.rgb) return '';
+  const [r, g, b] = l.rgb.map((v) => v / 255);
+  const max = Math.max(r, g, b); const min = Math.min(r, g, b);
+  if (max - min < 0.15) return 'white';
+  let h = max === r ? ((g - b) / (max - min)) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
+  h = (h * 60 + 360) % 360;
+  return h < 15 ? 'red' : h < 40 ? 'orange' : h < 65 ? 'yellow' : h < 160 ? 'green' : h < 195 ? 'cyan' : h < 255 ? 'blue' : h < 290 ? 'purple' : h < 340 ? 'pink' : 'red';
+}
+
 function deviceRow(item, kind) {
   const unavailable = item.state === 'unavailable';
   const on = opt(`${kind}:${item.id}`, item.state) === 'on';
   const hasWatts = item.watts !== null && item.watts !== undefined;
-  const status = on ? `On${hasWatts ? ` · ${fx(item.watts, 1)} W` : ''}` : 'Off';
+  const lit = kind === 'light' && on && item.state === 'on';
+  const lightBits = lit ? [item.brightness ? `${item.brightness}%` : null, colourName(item) || null].filter(Boolean) : [];
+  const status = on ? ['On', hasWatts ? `${fx(item.watts, 1)} W` : null, ...lightBits].filter(Boolean).join(' · ') : 'Off';
   const sub = unavailable ? 'Unavailable' : `${item.warn ? `${WARN_NOTE[item.warn] || 'Important'} · ` : ''}${status}`;
   const sw = unavailable
     ? '<button class="sw lock" disabled title="Unavailable"></button>'
     : `<button class="sw${on ? ' on' : ''}" data-cmd="${kind}:${esc(item.id)}" data-toggle data-name="${esc(item.name)}" data-watts="${item.watts ?? 0}"${item.warn ? ` data-warn="${esc(item.warn)}"` : ''} aria-label="${esc(item.name)}"></button>`;
-  return `<div class="drow${unavailable ? ' off' : ''}"><div class="ico">${icon(kind === 'light' ? 'bulb' : 'plug')}</div><div class="dn"><b>${esc(item.name)}</b><small>${esc(sub)}</small></div>${sw}</div>`;
+  const dot = lit && item.rgb ? `<i class="ldot" style="background:rgb(${item.rgb.map(Number).join(',')})"></i>` : '';
+  const adjust = kind === 'light' && item.dim && !unavailable ? `<button class="ladj" data-act="lightpanel" data-l="${esc(item.id)}" title="Brightness and colour" aria-label="${esc(item.name)}: brightness and colour">${icon('sliders')}</button>` : '';
+  return `<div class="drow${unavailable ? ' off' : ''}"><div class="ico">${icon(kind === 'light' ? 'bulb' : 'plug')}</div><div class="dn"><b>${esc(item.name)}</b><small>${dot}${esc(sub)}</small></div>${adjust}${sw}</div>`;
 }
+
+// ---------- brightness and colour for one light (a panel over the page, so live updates never interrupt a drag) ----------
+const SWATCHES = [['Red', 0, 100], ['Orange', 28, 100], ['Yellow', 52, 100], ['Green', 120, 90], ['Cyan', 185, 90], ['Blue', 225, 100], ['Purple', 275, 70], ['Pink', 320, 65]];
+let lightOpen = null;
+const findLight = (id) => model && model.catalogue.lights.flatMap((g) => g.items).find((l) => l.id === id);
+function openLightPanel(id) {
+  const l = findLight(id);
+  if (!l) return;
+  lightOpen = id;
+  const dlg = $('#lightdlg');
+  $('#ld-title').textContent = l.name;
+  const swatch = ([name, h, s]) => `<button class="sw8" data-hs="${h},${s}" title="${name}" aria-label="${name}" style="background:hsl(${h},${s}%,55%)"></button>`;
+  $('#ld-body').innerHTML = `
+    <div class="ld-row"><span>Power</span><button class="sw" id="ld-on" aria-label="${esc(l.name)} on or off"></button></div>
+    <label class="ld-lab">Brightness <b id="ld-bv"></b></label>
+    <input type="range" id="ld-bright" min="1" max="100" step="1">
+    ${l.temp ? `<label class="ld-lab">White <b id="ld-kv"></b></label><input type="range" id="ld-kelvin" class="kel" min="${l.minK}" max="${l.maxK}" step="100">` : ''}
+    ${l.colour ? `<label class="ld-lab">Colour</label><div class="ld-sw">${SWATCHES.map(swatch).join('')}</div>` : ''}`;
+  syncLightPanel();
+  if (!dlg.open) dlg.showModal();
+}
+function syncLightPanel() {
+  const l = lightOpen && findLight(lightOpen);
+  if (!l) return;
+  const on = opt(`light:${l.id}`, l.state) === 'on';
+  $('#ld-on').classList.toggle('on', on);
+  const b = $('#ld-bright'); const k = $('#ld-kelvin');
+  if (document.activeElement !== b && l.brightness) b.value = l.brightness;
+  $('#ld-bv').textContent = on && l.brightness ? `${l.brightness}%` : on ? '' : 'off';
+  if (k) { if (document.activeElement !== k && l.kelvin) k.value = l.kelvin; $('#ld-kv').textContent = l.mode === 'color_temp' && l.kelvin ? colourName(l) : ''; }
+  $('#ld-body').querySelectorAll('.sw8').forEach((s) => s.classList.toggle('on', on && l.mode !== 'color_temp' && colourName(l) === s.title.toLowerCase()));
+}
+function setLight(value) {
+  const l = findLight(lightOpen);
+  if (!l) return;
+  send(`lightset:${l.id}`, value).catch((err) => toast(`Failed: ${err.message}`));
+}
+$('#lightdlg').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) { $('#lightdlg').close(); return; } // tap outside the panel
+  if (e.target.closest('#ld-close')) { $('#lightdlg').close(); return; }
+  if (e.target.closest('#ld-on')) { const l = findLight(lightOpen); if (l) command(`light:${l.id}`, $('#ld-on').classList.contains('on') ? 'off' : 'on'); return; }
+  const sw = e.target.closest('.sw8');
+  if (sw) { const [h, s] = sw.dataset.hs.split(',').map(Number); setLight({ hs: [h, s] }); }
+});
+$('#lightdlg').addEventListener('input', (e) => {
+  if (e.target.id === 'ld-bright') $('#ld-bv').textContent = `${e.target.value}%`;
+});
+$('#lightdlg').addEventListener('change', (e) => {
+  if (e.target.id === 'ld-bright') setLight({ brightness: Number(e.target.value) });
+  if (e.target.id === 'ld-kelvin') setLight({ kelvin: Number(e.target.value) });
+});
+$('#lightdlg').addEventListener('close', () => { lightOpen = null; });
 
 function groupsHtml(groups, kind, room) {
   return groups.filter((g) => !room || g.name === room).map((g) => {
@@ -1013,6 +1087,7 @@ function renderAll() {
   updateScene(m);
   renderOutdoors(m);
   renderBestTime(m);
+  syncLightPanel();
   renderHeatSummary(m);
   renderTiles(m);
   renderBinList(m);
@@ -1113,6 +1188,7 @@ $('#navtoggle').addEventListener('click', () => {
 });
 $('#more').addEventListener('click', () => (document.body.classList.contains('drawer-open') ? closeDrawer() : openDrawer()));
 $('#drawer-back').addEventListener('click', closeDrawer);
+document.querySelectorAll('nav a[data-view]').forEach((a) => a.addEventListener('click', closeDrawer)); // also when it is the page already showing
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
 narrow.addEventListener('change', closeDrawer);
 setWide((() => { try { return localStorage.getItem('hc-nav') === 'wide'; } catch { return false; } })());

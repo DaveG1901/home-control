@@ -657,3 +657,27 @@ html[data-theme=light] .tile.good b{color:#047857}
 .grid[data-view=bins] #bins .bin-after{display:none}
 .bl-row>div:first-child{flex:none;min-width:0}
 .bl-row>div:first-child b,.bl-row>div:first-child span{white-space:nowrap}
+
+/* ---------- lit windows take the colour and brightness of the light behind them ---------- */
+.stage .win{--wc:255,200,130;--wl:.88;background:linear-gradient(180deg,rgba(var(--wc),.95),rgba(var(--wc),.72))}
+.stage.night .win.on,.stage.golden .win.on{opacity:var(--wl);box-shadow:0 0 16px 3px rgba(var(--wc),.45)}
+
+/* ---------- Lights page: colour dot, adjust button, and the brightness / colour panel ---------- */
+.ldot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px;box-shadow:0 0 6px rgba(255,255,255,.25),inset 0 0 0 1px rgba(255,255,255,.3)}
+.ladj{width:34px;height:34px;flex:none;display:grid;place-items:center;border-radius:10px;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer}
+.ladj:hover{color:var(--text);border-color:var(--line2)}
+.ladj svg{width:17px;height:17px}
+.ld-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+.ld-head h3{margin:0}
+.ld-x{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--mute);cursor:pointer;font-size:14px}
+.ld-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0 14px;font-size:14px}
+.ld-lab{display:flex;justify-content:space-between;font-size:13px;color:var(--mute);margin:6px 0 8px}
+.ld-lab b{color:var(--text);font-weight:600}
+.lightdlg input[type=range]{width:100%;margin:0 0 14px;accent-color:var(--blue);height:28px}
+.lightdlg input.kel{appearance:none;-webkit-appearance:none;height:12px;border-radius:99px;margin:8px 0 18px;background:linear-gradient(90deg,#ffb35c,#ffe2bf 45%,#f4f8ff 70%,#cfe0ff)}
+.lightdlg input.kel::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:#fff;border:2px solid var(--blue);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.lightdlg input.kel::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:2px solid var(--blue)}
+.ld-sw{display:grid;grid-template-columns:repeat(8,1fr);gap:8px;margin-bottom:4px}
+.sw8{aspect-ratio:1;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+.sw8.on{border-color:var(--text);box-shadow:0 0 0 2px var(--card-solid) inset}
+@media(max-width:560px){.ld-sw{grid-template-columns:repeat(4,1fr)}}

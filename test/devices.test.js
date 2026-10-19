@@ -168,3 +168,31 @@ test('starting a boost twice does not overwrite the remembered mode with the boo
   assert.equal((await cmd('boost:lobby', 120)).status, 200); // extend it
   assert.equal(app.boostMemory.get('lobby'), 'off', 'still the pre-boost mode, not "heat"');
 });
+
+test('lights: brightness, white and colour, only within what each bulb supports', async (t) => {
+  const { app, state, cmd } = await demoApp(t);
+  const bulb = 'light.living_room_bulb_1'; // Eleanor's colour bulb
+  const st0 = await state();
+  const info = st0.catalogue.lights.flatMap((g) => g.items).find((l) => l.id === 'eleanor_bulb');
+  assert.deepEqual([info.dim, info.colour, info.temp, info.brightness, info.rgb], [true, true, true, 30, [160, 77, 255]]);
+
+  assert.equal((await cmd('lightset:eleanor_bulb', { brightness: 60 })).status, 200);
+  await until(() => app.store.attr(bulb, 'brightness') === 153);
+  assert.equal((await cmd('lightset:eleanor_bulb', { kelvin: 2700, brightness: 40 })).status, 200);
+  await until(() => app.store.attr(bulb, 'color_temp_kelvin') === 2700);
+  assert.equal((await cmd('lightset:eleanor_bulb', { hs: [120, 100] })).status, 200);
+  await until(() => app.store.attr(bulb, 'color_mode') === 'hs');
+  assert.deepEqual(app.store.attr(bulb, 'rgb_color'), [0, 255, 0]);
+
+  // refused: nothing changes
+  const bad = [
+    ['lightset:eleanor_bulb', { brightness: 0 }], ['lightset:eleanor_bulb', { brightness: 101 }], ['lightset:eleanor_bulb', { brightness: 50.5 }],
+    ['lightset:eleanor_bulb', { kelvin: 9000 }], ['lightset:eleanor_bulb', { kelvin: 3000, hs: [10, 10] }], ['lightset:eleanor_bulb', { hs: [400, 10] }],
+    ['lightset:eleanor_bulb', { brightness: 50, effect: 'Party' }], ['lightset:eleanor_bulb', {}], ['lightset:eleanor_bulb', 'bright'],
+    ['lightset:eleanor_light', { brightness: 50 }], // a plain on/off light cannot be dimmed
+  ];
+  for (const [id, v] of bad) assert.equal((await cmd(id, v)).status, 400, `${id} ${JSON.stringify(v)}`);
+  assert.equal(app.store.attr(bulb, 'color_mode'), 'hs');
+  const after = await state();
+  assert.ok(after.activity.some((a) => /Eleanor bulb set to 40%, warm white/.test(a.text)));
+});

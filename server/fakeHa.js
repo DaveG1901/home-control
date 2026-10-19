@@ -81,11 +81,26 @@ function seed() {
     if (p.power && !s[p.power]) set(p.power, DEFAULT_W[p.id] ?? 0, { unit_of_measurement: 'W' });
   }
   const lightState = { downstairs_hall: 'unavailable', upstairs_hall: 'unavailable', lobby: 'unavailable', dave_bulb: 'unavailable', kasper_bulb: 'unavailable', michelle_light: 'unavailable', dave_light: 'off', kasper_light: 'off' };
-  for (const l of E.lights) set(l.light, lightState[l.id] || 'on');
+  for (const l of E.lights) {
+    const st = lightState[l.id] || 'on';
+    // smart bulbs do white (warm to cool) and colour; the others are plain on/off
+    const bulb = /bulb/.test(l.id);
+    const lit = l.id === 'eleanor_bulb'
+      ? { color_mode: 'hs', hs_color: [275, 70], rgb_color: [160, 77, 255], brightness: 77 }
+      : { color_mode: 'color_temp', color_temp_kelvin: 2700, rgb_color: [255, 167, 87], brightness: 204 };
+    set(l.light, st, bulb
+      ? { supported_color_modes: ['color_temp', 'hs'], min_color_temp_kelvin: 2500, max_color_temp_kelvin: 6500, ...(st === 'on' ? lit : {}) }
+      : { supported_color_modes: ['onoff'], ...(st === 'on' ? { color_mode: 'onoff' } : {}) });
+  }
   return s;
 }
 
 const E = require('./entities');
+function hsToRgb(h, s) { // full brightness; good enough for the demo
+  const c = s / 100; const x = c * (1 - Math.abs(((h / 60) % 2) - 1)); const m = 1 - c;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [r, g, b].map((v) => Math.round((v + m) * 255));
+}
 const PLUG_SENSOR = {}; // switch entity -> its power sensor (filled in when the fake is seeded)
 const E_UNAVAILABLE = new Set(['garage_extension', 'eleanor_tv']);
 const NOMINAL_WATTS = { garage_heater: 2000, dishwasher: 1200, tumble_dryer: 2200, washing_machine: 500, kids_laptops: 60, purifier: 5.9, tv_plug: 18 };
@@ -129,6 +144,16 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
     calls.push({ domain, service, data });
     const id = data.entity_id;
     const known = (e) => { if (!states[e]) throw Object.assign(new Error(`Entity ${e} not found`), { code: 'not_found' }); };
+    if (domain === 'light' && service === 'turn_on' && ('brightness_pct' in data || 'color_temp_kelvin' in data || 'hs_color' in data)) {
+      known(id);
+      const a = { ...states[id].attributes };
+      if ('brightness_pct' in data) a.brightness = Math.round((data.brightness_pct / 100) * 255);
+      if ('color_temp_kelvin' in data) { a.color_mode = 'color_temp'; a.color_temp_kelvin = data.color_temp_kelvin; a.rgb_color = [255, 200, 150]; delete a.hs_color; }
+      if ('hs_color' in data) { a.color_mode = 'hs'; a.hs_color = data.hs_color; a.rgb_color = hsToRgb(data.hs_color[0], data.hs_color[1]); delete a.color_temp_kelvin; }
+      if (!a.brightness) a.brightness = 255;
+      setState(id, 'on', a);
+      return;
+    }
     if ((domain === 'switch' || domain === 'light') && (service === 'turn_on' || service === 'turn_off')) {
       known(id); const on = service === 'turn_on';
       setState(id, on ? 'on' : 'off');

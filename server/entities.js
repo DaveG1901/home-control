@@ -133,6 +133,27 @@ const plugs = [
 
 // House lights (camera floodlights live on the Security card; access-point and switch LEDs are left out on purpose).
 const light = (group, id, name, entity) => ({ group, id, name, light: `light.${entity}` });
+
+// What a light can do and how it is set right now, from its Home Assistant attributes (only reported while it is on).
+const COLOUR_MODES = ['hs', 'rgb', 'xy', 'rgbw', 'rgbww'];
+function lightInfo(state, attrs = {}) {
+  const modes = Array.isArray(attrs.supported_color_modes) ? attrs.supported_color_modes : [];
+  const colour = modes.some((m) => COLOUR_MODES.includes(m));
+  const temp = modes.includes('color_temp');
+  const info = {
+    dim: colour || temp || modes.includes('brightness') || modes.includes('white'),
+    colour, temp,
+    minK: Number(attrs.min_color_temp_kelvin) || 2000, maxK: Number(attrs.max_color_temp_kelvin) || 6500,
+    brightness: null, rgb: null, kelvin: null, mode: null,
+  };
+  if (state === 'on') {
+    if (typeof attrs.brightness === 'number') info.brightness = Math.max(1, Math.round((attrs.brightness / 255) * 100));
+    if (Array.isArray(attrs.rgb_color) && attrs.rgb_color.length === 3) info.rgb = attrs.rgb_color.map((n) => Math.round(Number(n) || 0));
+    if (typeof attrs.color_temp_kelvin === 'number') info.kelvin = attrs.color_temp_kelvin;
+    info.mode = attrs.color_mode || null;
+  }
+  return info;
+}
 const lights = [
   light('Living areas', 'living_bulb_1', 'Living room bulb 1', 'smart_bulb'),
   light('Living areas', 'living_bulb_2', 'Living room bulb 2', 'living_room_bulb_2'),
@@ -185,7 +206,8 @@ const quickControls = ['dishwasher', 'tumble_dryer', 'garage_heater', 'purifier'
  * Command allowlist. A command is { entity, domain, services:(value)=>[{domain,service,data}], validate(value) }.
  * The client sends { id, value }; anything not defined here is rejected.
  */
-function buildCommands(ctx = { mode: () => null, preset: () => null, memory: new Map() }) {
+function buildCommands(ctx = { mode: () => null, preset: () => null, attr: () => null, memory: new Map() }) {
+  const attrOf = ctx.attr || (() => null);
   const cmds = new Map();
   const onOff = (v) => v === 'on' || v === 'off';
 
@@ -204,6 +226,31 @@ function buildCommands(ctx = { mode: () => null, preset: () => null, memory: new
       validate: onOff,
       call: (v) => ({ domain: 'light', service: v === 'on' ? 'turn_on' : 'turn_off', data: { entity_id: l.light } }),
       describe: (v) => `${l.name} switched ${v}`,
+    });
+    // Brightness, white (warm to cool) or a colour: { brightness: 1-100 } and/or ONE of { kelvin } or { hs: [hue 0-360, saturation 0-100] }.
+    // Only what the bulb itself says it supports is accepted.
+    const can = () => lightInfo('off', { supported_color_modes: attrOf(l.light, 'supported_color_modes'), min_color_temp_kelvin: attrOf(l.light, 'min_color_temp_kelvin'), max_color_temp_kelvin: attrOf(l.light, 'max_color_temp_kelvin') });
+    cmds.set(`lightset:${l.id}`, {
+      label: `${l.name} brightness and colour`,
+      validate: (v) => {
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+        const keys = Object.keys(v);
+        if (!keys.length || keys.some((k) => !['brightness', 'kelvin', 'hs'].includes(k)) || ('kelvin' in v && 'hs' in v)) return false;
+        const c = can();
+        const num = (n, lo, hi) => typeof n === 'number' && Number.isFinite(n) && n >= lo && n <= hi;
+        if ('brightness' in v && !(c.dim && Number.isInteger(v.brightness) && num(v.brightness, 1, 100))) return false;
+        if ('kelvin' in v && !(c.temp && num(v.kelvin, c.minK, c.maxK))) return false;
+        if ('hs' in v && !(c.colour && Array.isArray(v.hs) && v.hs.length === 2 && num(v.hs[0], 0, 360) && num(v.hs[1], 0, 100))) return false;
+        return true;
+      },
+      call: (v) => {
+        const data = { entity_id: l.light };
+        if ('brightness' in v) data.brightness_pct = v.brightness;
+        if ('kelvin' in v) data.color_temp_kelvin = Math.round(v.kelvin);
+        if ('hs' in v) data.hs_color = [Math.round(v.hs[0]), Math.round(v.hs[1])];
+        return { domain: 'light', service: 'turn_on', data };
+      },
+      describe: (v) => `${l.name} set to ${['brightness' in v ? `${v.brightness}%` : null, 'kelvin' in v ? (v.kelvin < 3500 ? 'warm white' : v.kelvin > 5000 ? 'cool white' : 'white') : null, 'hs' in v ? 'a colour' : null].filter(Boolean).join(', ')}`,
     });
   }
 
@@ -303,4 +350,4 @@ const houseWindows = {
   upRight: { lights: ['michelle_light'], plugs: [] },                                       // Michelle
 };
 
-module.exports = { area, solar, houseWindows, energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, bins, quickControls, surplusDevices, buildCommands, watchedEntities };
+module.exports = { lightInfo, area, solar, houseWindows, energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, bins, quickControls, surplusDevices, buildCommands, watchedEntities };

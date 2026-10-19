@@ -113,6 +113,14 @@ page. Pages: Home, Energy, Heating, Security, Plugs, Lights, Outside, Bins, Repo
 - **Phones:** a bottom bar with Home, Energy, Heating, Security and **More**, which slides a menu in from the right with
   every page.
 
+## Lights: brightness and colour
+
+The Lights page shows each bulb's brightness and colour while it is on ("On · 30% · purple", with a colour dot). The
+slider button on a dimmable bulb opens a panel: power, brightness, white (warm to cool) and eight colours. Commands are
+`lightset:<id>` with `{ brightness: 1-100 }` and/or one of `{ kelvin }` or `{ hs: [hue, saturation] }`; the server only accepts what that
+bulb reports it supports. In the house picture each lit window takes the colour and brightness of its brightest light
+(lamp plugs count as warm white). Home Assistant does not keep colours in its history, so this is live only.
+
 ## Light and dark theme
 
 A switch in the header cycles **Automatic** (the default: follows the device's own light/dark setting, live) → **Light** →

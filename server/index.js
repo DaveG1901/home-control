@@ -100,6 +100,7 @@ async function start(config = defaultConfig) {
   const commands = buildCommands({
     mode: (id) => { const e = store.raw(id); return e ? e.state : null; },
     preset: (id) => store.attr(id, 'preset_mode'),
+    attr: (id, name) => store.attr(id, name),
     memory: boostMemory,
   });
   const app = express();

@@ -40,9 +40,20 @@ class Store extends EventEmitter {
     const out = {};
     const lightById = new Map(E.lights.map((l) => [l.id, l]));
     const plugById = new Map(E.plugs.map((p) => [p.id, p]));
+    // Each window: is anything on, and if so the colour and brightness of the brightest light (lamp plugs are warm white).
+    const LAMP = [255, 190, 110];
     for (const [win, m] of Object.entries(E.houseWindows)) {
-      out[win] = m.lights.some((id) => lightById.has(id) && this.isOn(lightById.get(id).light))
-        || m.plugs.some((id) => plugById.has(id) && this.isOn(plugById.get(id).switch));
+      let best = null;
+      for (const id of m.lights) {
+        const l = lightById.get(id);
+        if (!l || !this.isOn(l.light)) continue;
+        const e = this.entities.get(l.light);
+        const i = E.lightInfo('on', e.attributes);
+        const level = i.brightness === null ? 1 : i.brightness / 100;
+        if (!best || level > best.level) best = { on: true, rgb: i.rgb || LAMP, level };
+      }
+      if (!best && m.plugs.some((id) => plugById.has(id) && this.isOn(plugById.get(id).switch))) best = { on: true, rgb: LAMP, level: 1 };
+      out[win] = best || { on: false, rgb: null, level: 0 };
     }
     return out;
   }
@@ -212,7 +223,7 @@ class Store extends EventEmitter {
     // Everything switchable, grouped for the Devices page. Locked plugs are listed (read-only) so nothing is hidden.
     const lightState = (l) => {
       const e = this.raw(l.light);
-      return { id: l.id, name: l.name, state: e ? e.state : 'unavailable', control: true };
+      return { id: l.id, name: l.name, state: e ? e.state : 'unavailable', control: true, ...E.lightInfo(e ? e.state : null, e ? e.attributes : {}) };
     };
     const catalogue = {
       plugs: E.groupBy(E.plugs).map((g) => ({ name: g.name, items: g.items.map(plugState) })),

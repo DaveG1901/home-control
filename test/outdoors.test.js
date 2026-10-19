@@ -91,7 +91,14 @@ test('only the owner gets outside data and map tiles; the map serves only tiles 
   const st = await (await fetch(`${base}/api/state`, { headers: { Cookie: owner } })).json();
   assert.ok(st.outdoors && st.outdoors.weather, 'demo outside data');
   assert.equal(st.outdoors.bestTime.known, true);
-  assert.equal(typeof st.houseWindows.groundLeft, 'boolean');
+  assert.equal(typeof st.houseWindows.groundLeft.on, 'boolean');
+  assert.equal(st.houseWindows.upLeft.on, true);
+  // with her main light off, Eleanor's window takes the colour and brightness of her colour bulb
+  const off = await fetch(`${base}/api/command`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: owner }, body: JSON.stringify({ id: 'light:eleanor_light', value: 'off' }) });
+  assert.equal(off.status, 200);
+  let win;
+  for (let i = 0; i < 40; i++) { win = (await (await fetch(`${base}/api/state`, { headers: { Cookie: owner } })).json()).houseWindows.upLeft; if (win.level < 1) break; await new Promise((r) => setTimeout(r, 25)); }
+  assert.deepEqual(win, { on: true, rgb: [160, 77, 255], level: 0.3 });
   const vs = await (await fetch(`${base}/api/state`, { headers: { Cookie: viewer } })).json();
   assert.equal(vs.outdoors, undefined, 'camera viewers get no outside data');
   assert.equal((await fetch(`${base}/api/maptile/base/7/63/42`, { headers: { Cookie: viewer } })).status, 403);

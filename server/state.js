@@ -42,18 +42,22 @@ class Store extends EventEmitter {
     const plugById = new Map(E.plugs.map((p) => [p.id, p]));
     // Each window: is anything on, and if so the colour and brightness of the brightest light (lamp plugs are warm white).
     const LAMP = [255, 190, 110];
+    // A bulb that reports its colour decides the window's colour; plain on/off lights and lamp plugs only add brightness.
+    // White bulbs are shaded by temperature (amber when warm, pale blue when cool), as Home Assistant reports 6500 K as plain white.
+    const whiteAt = (k) => { const t = Math.min(1, Math.max(0, (k - 2500) / 4000)); return [255 - 40 * t, 172 + 56 * t, 90 + 165 * t].map(Math.round); };
     for (const [win, m] of Object.entries(E.houseWindows)) {
-      let best = null;
+      let level = 0; let coloured = null; let any = false;
       for (const id of m.lights) {
         const l = lightById.get(id);
         if (!l || !this.isOn(l.light)) continue;
-        const e = this.entities.get(l.light);
-        const i = E.lightInfo('on', e.attributes);
-        const level = i.brightness === null ? 1 : i.brightness / 100;
-        if (!best || level > best.level) best = { on: true, rgb: i.rgb || LAMP, level };
+        const i = E.lightInfo('on', this.entities.get(l.light).attributes);
+        const lv = i.brightness === null ? 1 : i.brightness / 100;
+        any = true; level = Math.max(level, lv);
+        const rgb = i.mode === 'color_temp' && i.kelvin ? whiteAt(i.kelvin) : i.rgb;
+        if (rgb && (!coloured || lv > coloured.lv)) coloured = { rgb, lv };
       }
-      if (!best && m.plugs.some((id) => plugById.has(id) && this.isOn(plugById.get(id).switch))) best = { on: true, rgb: LAMP, level: 1 };
-      out[win] = best || { on: false, rgb: null, level: 0 };
+      if (m.plugs.some((id) => plugById.has(id) && this.isOn(plugById.get(id).switch))) { any = true; level = 1; }
+      out[win] = any ? { on: true, rgb: coloured ? coloured.rgb : LAMP, level } : { on: false, rgb: null, level: 0 };
     }
     return out;
   }

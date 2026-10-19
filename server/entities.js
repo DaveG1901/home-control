@@ -136,13 +136,13 @@ const light = (group, id, name, entity) => ({ group, id, name, light: `light.${e
 const lights = [
   light('Living areas', 'living_bulb_1', 'Living room bulb 1', 'smart_bulb'),
   light('Living areas', 'living_bulb_2', 'Living room bulb 2', 'living_room_bulb_2'),
-  light('Living areas', 'living_bulb_3', 'Living room bulb 3 (named "Eleanor" in HA)', 'living_room_bulb_1'),
   light('Living areas', 'downstairs_hall', 'Downstairs hall', 'downstairs_hall_light'),
   light('Living areas', 'upstairs_hall', 'Upstairs hall', 'upstairs_hall_light'),
   light('Living areas', 'lobby', 'Lobby', 'lobby_light'),
   light('Bedrooms', 'dave_light', 'Dave light', 'dave_light'),
   light('Bedrooms', 'dave_bulb', 'Dave bulb', 'dave_bedroom_bulb'),
   light('Bedrooms', 'eleanor_light', 'Eleanor light', 'eleanor_light'),
+  light('Bedrooms', 'eleanor_bulb', 'Eleanor bulb', 'living_room_bulb_1'), // Eleanor's colour bulb (HA calls it "Eleanor"; the entity id says living room)
   light('Bedrooms', 'kasper_light', 'Kasper light', 'kasper_bedroom_light'),
   light('Bedrooms', 'kasper_bulb', 'Kasper bulb', 'kasper_bulb'),
   light('Bedrooms', 'michelle_light', 'Michelle bedroom light', 'michelle_bedroom_light'),
@@ -297,8 +297,8 @@ const solar = { kwp: 8.8 };
 const houseWindows = {
   groundLeft: { lights: ['office_light', 'office_bulb'], plugs: [] },                     // office
   groundHall: { lights: ['downstairs_hall', 'lobby'], plugs: ['downstairs_hall'] },          // hall and front door
-  groundRight: { lights: ['living_bulb_1', 'living_bulb_2', 'living_bulb_3'], plugs: ['lamp_plug', 'living_big_lamp'] }, // living room
-  upLeft: { lights: ['eleanor_light'], plugs: [] },                                         // Eleanor
+  groundRight: { lights: ['living_bulb_1', 'living_bulb_2'], plugs: ['lamp_plug', 'living_big_lamp'] }, // living room
+  upLeft: { lights: ['eleanor_light', 'eleanor_bulb'], plugs: [] },                                         // Eleanor
   upMiddle: { lights: ['upstairs_hall'], plugs: [] },                                     // upstairs hall
   upRight: { lights: ['michelle_light'], plugs: [] },                                       // Michelle
 };

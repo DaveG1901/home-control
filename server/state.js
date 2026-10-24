@@ -29,10 +29,22 @@ class Store extends EventEmitter {
     this.spareAvg = null; // smoothed spare solar (kW), so the card does not flicker with every cloud
     this.spareT = 0;
     this.binsSource = null; // set by the server: the bin collection service
+    this.todos = new Map(); // to-do list id -> items
     this.outdoorsSource = null; // set by the server: weather, radar, grid carbon, aurora, floods
   }
 
   setBins(service) { this.binsSource = service; }
+
+  /** A to-do list's items from Home Assistant (uid, summary, status, due). */
+  setTodo(entityId, items) {
+    const list = E.todoLists.find((l) => l.entity === entityId);
+    if (!list) return;
+    this.todos.set(list.id, items.slice(0, 300).map((i) => ({
+      uid: String(i.uid), summary: String(i.summary || '').slice(0, 300), done: i.status === 'completed', due: i.due || null,
+    })));
+    this.emit('change');
+  }
+  todoItems(listId) { return this.todos.get(listId) || []; }
   setOutdoors(service) { this.outdoorsSource = service; }
 
   /** Which windows of the house picture have a light or lamp on behind them. */
@@ -244,6 +256,7 @@ class Store extends EventEmitter {
       bins: this.binsSource ? this.binsSource.view() : { available: false, next: null, then: [] },
       outdoors: this.outdoorsSource ? this.outdoorsSource.view(n(E.energy.pv)) : null,
       houseWindows: this.houseWindows(),
+      todos: E.todoLists.map((l) => ({ id: l.id, name: l.name, loaded: this.todos.has(l.id), items: this.todoItems(l.id) })),
       activity: this.activity.slice(0, 50), // each page shows its own part of it
     };
   }

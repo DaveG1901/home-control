@@ -1058,6 +1058,10 @@ function renderTiles(m) {
     const dots = n.bins.map((k) => `<i class="cdot" style="background:${esc(k.color)}" title="${esc(k.label)}"></i>`).join('');
     tile('#/bins', 'trash', 'Next bins', esc(n.when), `${dots} ${esc(n.bins.map((k) => k.label).join(', ') || n.summary)}`, b.putOutTonight || n.daysAway === 0 ? 'warn' : '');
   }
+  for (const l of m.todos || []) {
+    const open = l.items.filter((i) => !i.done);
+    if (l.loaded) tile('#/lists', 'check', l.name, open.length ? `${open.length} to do` : 'All done', open.length ? esc(open.slice(0, 4).map((i) => i.summary).join(', ')) : 'Nothing on the list');
+  }
   if (o && o.rain && o.rain.known) tile('#/outside', 'cloud', 'Rain', o.rain.raining ? 'Raining' : o.rain.startsInMin !== null ? `In ${o.rain.startsInMin} min` : 'Dry', esc(o.rain.text), o.rain.raining || o.rain.startsInMin !== null ? 'wet' : '');
   if (o && o.bestTime && o.bestTime.best) {
     const bt = o.bestTime.best;
@@ -1077,6 +1081,65 @@ function renderBinList(m) {
   setHTML($('#binlist'), `<div class="hd"><h2>Coming up</h2><span class="tag">Next ${later.length} collections</span></div>${rows || '<div class="empty">No later collections found in the council calendar.</div>'}`);
 }
 
+// ---------- to-do lists (Home Assistant's lists, kept in step with its app) ----------
+// The add box is built once, so live updates never wipe what is being typed; only the items are redrawn.
+let todoKey = '';
+function buildTodos(m) {
+  const lists = m.todos || [];
+  const key = lists.map((l) => l.id).join(',');
+  if (key === todoKey) return;
+  todoKey = key;
+  $('#todos').innerHTML = lists.length ? lists.map((l) => `
+    <div class="tlist" data-list="${esc(l.id)}">
+      <div class="hd"><h2>${esc(l.name)}</h2><span class="tag" data-count></span></div>
+      <form class="tl-add" data-list="${esc(l.id)}" autocomplete="off">
+        <input type="text" maxlength="200" placeholder="Add to ${esc(l.name.toLowerCase())}" enterkeyhint="done" aria-label="Add to ${esc(l.name)}">
+        <button class="btn" type="submit">Add</button>
+      </form>
+      <ul class="tl-items" data-open></ul>
+      <details class="tl-done" hidden><summary data-donecount></summary><ul class="tl-items" data-done></ul>
+        <button class="btn" type="button" data-todo="clear" data-list="${esc(l.id)}">Clear ticked-off</button></details>
+    </div>`).join('') : '<div class="empty">No lists set up.</div>';
+}
+function renderTodos(m) {
+  buildTodos(m);
+  for (const l of m.todos || []) {
+    const box = document.querySelector(`.tlist[data-list="${l.id}"]`);
+    if (!box) continue;
+    const open = l.items.filter((i) => !i.done);
+    const done = l.items.filter((i) => i.done);
+    const row = (i) => `<li class="${i.done ? 'done' : ''}"><button class="tick${i.done ? ' on' : ''}" data-todo="${i.done ? 'undo' : 'done'}" data-list="${esc(l.id)}" data-uid="${esc(i.uid)}" aria-label="${i.done ? 'Put back' : 'Tick off'} ${esc(i.summary)}"></button><span>${esc(i.summary)}</span><button class="tdel" data-todo="remove" data-list="${esc(l.id)}" data-uid="${esc(i.uid)}" aria-label="Remove ${esc(i.summary)}">✕</button></li>`;
+    box.querySelector('[data-count]').textContent = l.loaded ? (open.length ? `${open.length} to do` : 'All done') : 'Loading…';
+    setHTML(box.querySelector('[data-open]'), l.loaded && !open.length ? '<li class="empty">Nothing on the list. Add something above.</li>' : open.map(row).join(''));
+    const d = box.querySelector('.tl-done');
+    d.hidden = !done.length;
+    box.querySelector('[data-donecount]').textContent = `Ticked off (${done.length})`;
+    setHTML(box.querySelector('[data-done]'), done.map(row).join(''));
+  }
+}
+$('#todos').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target.closest('.tl-add');
+  const input = form.querySelector('input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  try { await send(`todo.add:${form.dataset.list}`, text); } catch (err) { input.value = text; toast(`Failed: ${err.message}`); }
+  input.focus();
+});
+$('#todos').addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-todo]');
+  if (!b) return;
+  const { todo, list, uid } = b.dataset;
+  const li = b.closest('li');
+  if (li) li.classList.add('pending');
+  try {
+    if (todo === 'done' || todo === 'undo') await send(`todo.done:${list}`, { uid, done: todo === 'done' });
+    else if (todo === 'remove') await send(`todo.remove:${list}`, uid);
+    else if (todo === 'clear') await send(`todo.clear:${list}`, true);
+  } catch (err) { if (li) li.classList.remove('pending'); toast(`Failed: ${err.message}`); }
+});
+
 // ---------- render ----------
 function renderAll() {
   const m = model;
@@ -1087,6 +1150,7 @@ function renderAll() {
   updateScene(m);
   renderOutdoors(m);
   renderBestTime(m);
+  renderTodos(m);
   syncLightPanel();
   renderHeatSummary(m);
   renderTiles(m);
@@ -1132,12 +1196,13 @@ const VIEWS = {
   security: ['security', 'activity'],
   plugs: ['plugs'],
   lights: ['lights'],
+  lists: ['todos'],
   outside: ['outdoors'],
   bins: ['bins', 'binlist'],
   reports: ['power', 'today'],
   cameras: ['security'], // the only view a camera-only sign-in has
 };
-const VIEW_TITLES = { cameras: 'Cameras', overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', plugs: 'Plugs', lights: 'Lights', outside: 'Outside', bins: 'Bins', reports: 'Reports' };
+const VIEW_TITLES = { cameras: 'Cameras', overview: 'Overview', energy: 'Energy', heating: 'Heating', security: 'Security', plugs: 'Plugs', lights: 'Lights', lists: 'Lists', outside: 'Outside', bins: 'Bins', reports: 'Reports' };
 const OLD_VIEWS = { devices: 'plugs' }; // old bookmarks
 
 function setView(name) {

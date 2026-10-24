@@ -315,6 +315,41 @@ function buildCommands(ctx = { mode: () => null, preset: () => null, attr: () =>
     });
   }
 
+  // To-do lists. Items are referred to by Home Assistant's own id (uid), and only ids that are on the list right now are accepted.
+  const itemsOf = ctx.todoItems || (() => []);
+  const findItem = (list, uid) => (typeof uid === 'string' && uid.length <= 100 ? itemsOf(list.id).find((i) => i.uid === uid) : null);
+  const clean = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '');
+  for (const list of todoLists) {
+    cmds.set(`todo.add:${list.id}`, {
+      label: `Add to ${list.name}`,
+      validate: (v) => clean(v).length >= 1 && clean(v).length <= 200,
+      call: (v) => ({ domain: 'todo', service: 'add_item', data: { entity_id: list.entity, item: clean(v) } }),
+      describe: (v) => `${clean(v)} added to ${list.name}`,
+      kind: 'lists',
+    });
+    cmds.set(`todo.done:${list.id}`, {
+      label: `Tick off on ${list.name}`,
+      validate: (v) => !!v && typeof v === 'object' && typeof v.done === 'boolean' && !!findItem(list, v.uid),
+      call: (v) => ({ domain: 'todo', service: 'update_item', data: { entity_id: list.entity, item: v.uid, status: v.done ? 'completed' : 'needs_action' } }),
+      describe: (v) => `${(findItem(list, v.uid) || {}).summary || 'Item'} ${v.done ? 'ticked off' : 'put back'} on ${list.name}`,
+      kind: 'lists',
+    });
+    cmds.set(`todo.remove:${list.id}`, {
+      label: `Remove from ${list.name}`,
+      validate: (v) => !!findItem(list, v),
+      call: (v) => ({ domain: 'todo', service: 'remove_item', data: { entity_id: list.entity, item: v } }),
+      describe: (v) => `${(findItem(list, v) || {}).summary || 'Item'} removed from ${list.name}`,
+      kind: 'lists',
+    });
+    cmds.set(`todo.clear:${list.id}`, {
+      label: `Clear ticked-off items on ${list.name}`,
+      validate: (v) => v === true && itemsOf(list.id).some((i) => i.done),
+      call: () => ({ domain: 'todo', service: 'remove_completed_items', data: { entity_id: list.entity } }),
+      describe: () => `Ticked-off items cleared from ${list.name}`,
+      kind: 'lists',
+    });
+  }
+
   return cmds;
 }
 
@@ -330,6 +365,12 @@ function watchedEntities() {
   for (const l of lights) set.add(l.light);
   return set;
 }
+
+// ---- to-do lists (Home Assistant's own lists, so they stay in step with its app and voice assistants) ----
+// To show another list, add it in Home Assistant (Settings > Devices & services > Add integration > Local To-do) and here.
+const todoLists = [
+  { id: 'shopping', name: 'Shopping list', entity: 'todo.shopping_list' },
+];
 
 // ---- outside the house (free public data, no Home Assistant needed) ----
 // The village, not the house: the middle of Uffington. Only this (and the SN7 postcode district, for grid carbon) is ever
@@ -350,4 +391,4 @@ const houseWindows = {
   upRight: { lights: ['michelle_light'], plugs: [] },                                       // Michelle
 };
 
-module.exports = { lightInfo, area, solar, houseWindows, energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, bins, quickControls, surplusDevices, buildCommands, watchedEntities };
+module.exports = { todoLists, lightInfo, area, solar, houseWindows, energy, environment, heating, doorbells, cameras, plugs, lights, groupBy, bins, quickControls, surplusDevices, buildCommands, watchedEntities };

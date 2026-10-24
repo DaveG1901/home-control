@@ -65,6 +65,10 @@ async function start(config = defaultConfig) {
   ha.on('fatal', (m) => { console.error('[ha] FATAL:', m); store.setFatal(m); });
   ha.on('states', (list) => { store.applyStates(list); history.add(store.sample()); });
   ha.on('state_changed', (id, s) => store.applyChange(id, s));
+  ha.on('todo', (entityId, items) => store.setTodo(entityId, items));
+  ha.on('connected', () => {
+    for (const l of require('./entities').todoLists) ha.subscribeTodo(l.entity).catch((err) => console.warn(`[todo] ${l.entity}: ${err.message}`));
+  });
   ha.start();
 
   // Bin collections: read from the council calendar in Home Assistant (made-up Mondays in demo mode)
@@ -101,6 +105,7 @@ async function start(config = defaultConfig) {
     mode: (id) => { const e = store.raw(id); return e ? e.state : null; },
     preset: (id) => store.attr(id, 'preset_mode'),
     attr: (id, name) => store.attr(id, name),
+    todoItems: (listId) => store.todoItems(listId),
     memory: boostMemory,
   });
   const app = express();
@@ -244,7 +249,7 @@ async function start(config = defaultConfig) {
     try {
       const c = cmd.call(value);
       await ha.callService(c.domain, c.service, c.data);
-      const kind = /^(heating\.|boost:|hotwater\.)/.test(id) ? 'heating' : id.startsWith('floodlight:') ? 'security' : 'devices';
+      const kind = cmd.kind || (/^(heating\.|boost:|hotwater\.)/.test(id) ? 'heating' : id.startsWith('floodlight:') ? 'security' : 'devices');
       store.log(cmd.describe(value), 'You', kind);
       return res.json({ ok: true });
     } catch (err) {

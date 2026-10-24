@@ -58,6 +58,7 @@ class HAClient extends EventEmitter {
     this.cache = new Map();   // subscribe_entities: the latest full state of each subscribed entity
     this.entSubId = null;     // id of the subscribe_entities subscription on the current connection
     this.initialTimer = null;
+    this.todoSubs = new Map(); // subscription id -> to-do entity, for the current connection
     this.ws = null;
     this.nextId = 1;
     this.pending = new Map(); // id -> { resolve, reject, timer }
@@ -123,7 +124,9 @@ class HAClient extends EventEmitter {
         break;
       }
       case 'event':
-        if (this.entSubId !== null && msg.id === this.entSubId && msg.event) {
+        if (this.todoSubs.has(msg.id) && msg.event) {
+          this.emit('todo', this.todoSubs.get(msg.id), Array.isArray(msg.event.items) ? msg.event.items : []);
+        } else if (this.entSubId !== null && msg.id === this.entSubId && msg.event) {
           const touched = applyCompressed(this.cache, msg.event);
           if (!this.connected) {
             // the first message after subscribing is the full current state of every subscribed entity
@@ -173,6 +176,7 @@ class HAClient extends EventEmitter {
     const wasConnected = this.connected;
     this.connected = false;
     this.entSubId = null;
+    this.todoSubs.clear();
     clearTimeout(this.initialTimer);
     this._clearTimers();
     for (const [, p] of this.pending) { clearTimeout(p.timer); p.reject(new Error('Disconnected from Home Assistant')); }
@@ -229,6 +233,14 @@ class HAClient extends EventEmitter {
     const r = await this._send({ type: 'camera/stream', entity_id: entityId, format: 'hls' });
     if (!r || typeof r.url !== 'string') throw new Error('Home Assistant did not return a stream address');
     return r.url;
+  }
+
+  /** Follow a to-do list: emits 'todo' (entityId, items) now and whenever it changes. Call again after each reconnect. */
+  async subscribeTodo(entityId) {
+    if (!this.connected) throw new Error('Not connected to Home Assistant');
+    const id = this.nextId; // the id _send is about to use; the list's events carry it
+    this.todoSubs.set(id, entityId);
+    try { await this._send({ type: 'todo/item/subscribe', entity_id: entityId }); } catch (err) { this.todoSubs.delete(id); throw err; }
   }
 
   /** Call a Home Assistant service, e.g. callService('switch', 'turn_off', { entity_id: 'switch.x' }). */

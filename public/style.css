@@ -681,3 +681,29 @@ html[data-theme=light] .tile.good b{color:#047857}
 .sw8{aspect-ratio:1;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
 .sw8.on{border-color:var(--text);box-shadow:0 0 0 2px var(--card-solid) inset}
 @media(max-width:560px){.ld-sw{grid-template-columns:repeat(4,1fr)}}
+
+/* ---------- to-do lists ---------- */
+.grid[data-view=lists] #todos{grid-column:span 12}
+#todos{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:26px 30px}
+.tlist{min-width:0}
+.tl-add{display:flex;gap:8px;margin-bottom:12px}
+.tl-add input{flex:1;min-width:0;padding:11px 14px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;font-size:15px;outline:none}
+.tl-add input:focus{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+.tl-add .btn{padding:10px 18px;font-size:14px}
+.tl-items{list-style:none;padding:0;margin:0}
+.tl-items li{display:flex;align-items:center;gap:12px;padding:9px 4px;border-bottom:1px solid var(--line);font-size:15px;transition:opacity .2s}
+.tl-items li:last-child{border-bottom:0}
+.tl-items li span{flex:1;min-width:0;overflow-wrap:anywhere}
+.tl-items li.done span{color:var(--dim);text-decoration:line-through}
+.tl-items li.pending{opacity:.45}
+.tl-items li.empty{color:var(--dim);font-size:13px;border:0}
+.tick{width:24px;height:24px;flex:none;border-radius:50%;border:2px solid var(--line2);background:none;cursor:pointer;position:relative}
+.tick:hover{border-color:var(--sky)}
+.tick.on{background:var(--blue);border-color:var(--blue)}
+.tick.on::after{content:"";position:absolute;left:7px;top:3px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+.tdel{width:30px;height:30px;flex:none;border-radius:8px;border:0;background:none;color:var(--dim);cursor:pointer;font-size:13px;opacity:.6}
+.tdel:hover{opacity:1;color:#f87171;background:rgba(248,113,113,.1)}
+.tl-done{margin-top:12px}
+.tl-done summary{cursor:pointer;color:var(--mute);font-size:13px;padding:6px 0}
+.tl-done .btn{margin-top:10px}
+@media(max-width:700px){.tl-items li{padding:11px 2px}.tdel{opacity:.8}}

@@ -108,6 +108,13 @@ const NOMINAL_WATTS = { garage_heater: 2000, dishwasher: 1200, tumble_dryer: 220
 async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0, animate = true } = {}) {
   const states = seed();
   const subscribers = new Map(); // ws -> subscription id (subscribe_events: every change)
+  const todoSubs = new Map(); // ws -> [{ id, entity }]
+  const todos = { 'todo.shopping_list': [{ uid: 'demo-1', summary: 'Milk', status: 'needs_action' }, { uid: 'demo-2', summary: 'Bread', status: 'needs_action' }, { uid: 'demo-3', summary: 'Bin bags', status: 'completed' }] };
+  let todoSeq = 10;
+  function todoChanged(entity) {
+    states[entity] = { entity_id: entity, state: String(todos[entity].filter((i) => i.status === 'needs_action').length), attributes: { friendly_name: 'Shopping list', supported_features: 15 } };
+    for (const [ws, subs] of todoSubs) for (const s of subs) if (s.entity === entity && ws.readyState === 1) ws.send(JSON.stringify({ id: s.id, type: 'event', event: { items: todos[entity] } }));
+  }
   const entitySubs = new Map(); // ws -> { id, ids } (subscribe_entities: only the listed entities, compact format)
   const wss = new WebSocketServer({ host, port, path: '/api/websocket' });
   await new Promise((resolve) => wss.once('listening', resolve));
@@ -143,6 +150,18 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
   function callService(domain, service, data) {
     calls.push({ domain, service, data });
     const id = data.entity_id;
+    if (domain === 'todo') {
+      const list = todos[id];
+      if (!list) throw Object.assign(new Error(`Entity ${id} not found`), { code: 'not_found' });
+      const find = () => { const i = list.find((x) => x.uid === data.item || x.summary === data.item); if (!i) throw Object.assign(new Error('Item not found'), { code: 'not_found' }); return i; };
+      if (service === 'add_item') list.push({ uid: `demo-${++todoSeq}`, summary: data.item, status: 'needs_action' });
+      else if (service === 'update_item') { const i = find(); if (data.status) i.status = data.status; if (data.rename) i.summary = data.rename; }
+      else if (service === 'remove_item') list.splice(list.indexOf(find()), 1);
+      else if (service === 'remove_completed_items') todos[id] = list.filter((x) => x.status !== 'completed');
+      else throw Object.assign(new Error(`Unknown service todo.${service}`), { code: 'not_found' });
+      todoChanged(id);
+      return;
+    }
     const known = (e) => { if (!states[e]) throw Object.assign(new Error(`Entity ${e} not found`), { code: 'not_found' }); };
     if (domain === 'light' && service === 'turn_on' && ('brightness_pct' in data || 'color_temp_kelvin' in data || 'hs_color' in data)) {
       known(id);
@@ -205,6 +224,12 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
           if (!states[m.entity_id]) fail('not_found', 'Entity not found'); else ok({ url: '/api/hls/faketoken/master_playlist.m3u8' });
           break;
         case 'subscribe_events': subscribers.set(ws, m.id); ok(); break;
+        case 'todo/item/subscribe':
+          if (!todos[m.entity_id]) { fail('not_found', 'Entity not found'); break; }
+          todoSubs.set(ws, [...(todoSubs.get(ws) || []), { id: m.id, entity: m.entity_id }]);
+          ok();
+          ws.send(JSON.stringify({ id: m.id, type: 'event', event: { items: todos[m.entity_id] } }));
+          break;
         case 'subscribe_entities': {
           const ids = new Set(m.entity_ids || []);
           entitySubs.set(ws, { id: m.id, ids });
@@ -221,7 +246,7 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
         default: fail('unknown_command', `Unknown command ${m.type}`);
       }
     });
-    ws.on('close', () => { subscribers.delete(ws); entitySubs.delete(ws); });
+    ws.on('close', () => { subscribers.delete(ws); entitySubs.delete(ws); todoSubs.delete(ws); });
   });
 
   // Make the numbers move so the dashboard feels alive.

@@ -113,6 +113,13 @@ page. Pages: Home, Energy, Heating, Security, Plugs, Lights, Outside, Bins, Repo
 - **Phones:** a bottom bar with Home, Energy, Heating, Security and **More**, which slides a menu in from the right with
   every page.
 
+## Lists
+
+The Lists page shows Home Assistant's own to-do lists (`todoLists` in `server/entities.js`; today just the Shopping list),
+followed live, so it stays in step with the Home Assistant app and voice assistants. Add, tick off, put back, remove, and
+clear ticked-off items. Items are referred to by Home Assistant's id and only items on the list right now are accepted.
+Home shows a tile per list. To add another list: create it in Home Assistant (Local To-do), then add it to `todoLists`.
+
 ## Lights: brightness and colour
 
 The Lights page shows each bulb's brightness and colour while it is on ("On · 30% · purple", with a colour dot). The

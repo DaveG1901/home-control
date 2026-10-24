@@ -196,3 +196,32 @@ test('lights: brightness, white and colour, only within what each bulb supports'
   const after = await state();
   assert.ok(after.activity.some((a) => /Eleanor bulb set to 40%, warm white/.test(a.text)));
 });
+
+test('to-do lists: shown live, add, tick off, put back, remove, clear ticked-off; bad input refused', async (t) => {
+  const { app, state, cmd } = await demoApp(t);
+  const list = async () => (await state()).todos.find((l) => l.id === 'shopping');
+  await until(async () => (await list()).loaded);
+  assert.deepEqual((await list()).items.map((i) => [i.summary, i.done]), [['Milk', false], ['Bread', false], ['Bin bags', true]]);
+
+  assert.equal((await cmd('todo.add:shopping', '  Washing   up liquid ')).status, 200);
+  const added = await until(async () => (await list()).items.find((i) => i.summary === 'Washing up liquid'));
+  assert.equal((await cmd('todo.done:shopping', { uid: added.uid, done: true })).status, 200);
+  await until(async () => (await list()).items.find((i) => i.uid === added.uid).done);
+  assert.equal((await cmd('todo.done:shopping', { uid: added.uid, done: false })).status, 200);
+  await until(async () => !(await list()).items.find((i) => i.uid === added.uid).done);
+  const milk = (await list()).items.find((i) => i.summary === 'Milk');
+  assert.equal((await cmd('todo.remove:shopping', milk.uid)).status, 200);
+  await until(async () => !(await list()).items.some((i) => i.summary === 'Milk'));
+  assert.equal((await cmd('todo.clear:shopping', true)).status, 200);
+  await until(async () => !(await list()).items.some((i) => i.done));
+  assert.equal((await cmd('todo.clear:shopping', true)).status, 400, 'nothing left to clear');
+
+  for (const [id, v] of [['todo.add:shopping', ''], ['todo.add:shopping', '   '], ['todo.add:shopping', 'x'.repeat(201)], ['todo.add:shopping', 42],
+    ['todo.done:shopping', { uid: 'no-such-item', done: true }], ['todo.done:shopping', { uid: added.uid, done: 'yes' }],
+    ['todo.remove:shopping', 'no-such-item'], ['todo.add:no_such_list', 'Milk']]) {
+    assert.ok([400, 404].includes((await cmd(id, v)).status), `${id} ${JSON.stringify(v)}`);
+  }
+  const after = await state();
+  assert.ok(after.activity.some((a) => a.text === 'Washing up liquid added to Shopping list' && a.kind === 'lists'));
+  assert.ok(app.store.todoItems('shopping').length >= 2);
+});

@@ -370,6 +370,7 @@ function watchedEntities() {
 // To show another list, add it in Home Assistant (Settings > Devices & services > Add integration > Local To-do) and here.
 const todoLists = [
   { id: 'shopping', name: 'Shopping list', entity: 'todo.shopping_list' },
+  { id: 'todo', name: 'To-do list', entity: 'todo.to_do_list' },
 ];
 
 // ---- outside the house (free public data, no Home Assistant needed) ----

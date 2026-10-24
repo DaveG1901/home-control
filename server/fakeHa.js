@@ -111,6 +111,7 @@ async function createFakeHa({ token = 'demo-token', host = '127.0.0.1', port = 0
   const todoSubs = new Map(); // ws -> [{ id, entity }]
   const todos = { 'todo.shopping_list': [{ uid: 'demo-1', summary: 'Milk', status: 'needs_action' }, { uid: 'demo-2', summary: 'Bread', status: 'needs_action' }, { uid: 'demo-3', summary: 'Bin bags', status: 'completed' }] };
   let todoSeq = 10;
+  for (const l of E.todoLists) if (!todos[l.entity]) todos[l.entity] = []; // every list the app shows exists in the demo
   function todoChanged(entity) {
     states[entity] = { entity_id: entity, state: String(todos[entity].filter((i) => i.status === 'needs_action').length), attributes: { friendly_name: 'Shopping list', supported_features: 15 } };
     for (const [ws, subs] of todoSubs) for (const s of subs) if (s.entity === entity && ws.readyState === 1) ws.send(JSON.stringify({ id: s.id, type: 'event', event: { items: todos[entity] } }));

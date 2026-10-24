@@ -115,7 +115,7 @@ page. Pages: Home, Energy, Heating, Security, Plugs, Lights, Outside, Bins, Repo
 
 ## Lists
 
-The Lists page shows Home Assistant's own to-do lists (`todoLists` in `server/entities.js`; today just the Shopping list),
+The Lists page shows Home Assistant's own to-do lists (`todoLists` in `server/entities.js`; the Shopping list and the To-do list),
 followed live, so it stays in step with the Home Assistant app and voice assistants. Add, tick off, put back, remove, and
 clear ticked-off items. Items are referred to by Home Assistant's id and only items on the list right now are accepted.
 Home shows a tile per list. To add another list: create it in Home Assistant (Local To-do), then add it to `todoLists`.
